@@ -22,7 +22,7 @@ app.add_middleware(
 
 # --- DB Connection ---
 def get_connection():
-    driver = os.getenv("AZURE_SQL_DRIVER", "ODBC Driver 17 for SQL Server")
+    driver = os.getenv("AZURE_SQL_DRIVER", "ODBC Driver 18 for SQL Server")
     server = os.getenv("AZURE_SQL_SERVER")
     database = os.getenv("AZURE_SQL_DB")
     uid = os.getenv("AZURE_SQL_USER")
@@ -235,3 +235,4 @@ def track_js():
 })();
     """
     return Response(content=js_content, media_type="application/javascript")
+
