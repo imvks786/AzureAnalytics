@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, Form
+from fastapi import FastAPI, Request, HTTPException, Form, Body
 from fastapi.responses import HTMLResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -132,17 +132,26 @@ def add_site(site_name: str = Form(...), domain: str = Form(...)):
     <h3>✅ Site Added</h3>
     <p>Site ID: <b>{site_id}</b></p>
     <code>
-    &lt;script src="https://YOURDOMAIN/track.js" data-site-id="{site_id}"&gt;&lt;/script&gt;
+    &lt;script src="https://analytics-imvks.azurewebsites.net/track.js" data-site-id="{site_id}"&gt;&lt;/script&gt;
     </code>
     """
 
-# ---------------- COLLECT ----------------
 @app.post("/collect")
-def collect(event: CollectEvent, request: Request):
+async def collect(request: Request):
+    data = await request.json()
+
+    site_id = data.get("siteId")
+    visitor_id = data.get("visitorId")
+
+    if not site_id or not visitor_id:
+        raise HTTPException(status_code=400, detail="Invalid payload")
+
     conn = get_connection()
     cur = conn.cursor()
+
     try:
-        cur.execute("SELECT 1 FROM sites WHERE site_id=%s", (event.siteId,))
+        # validate site
+        cur.execute("SELECT 1 FROM sites WHERE site_id=%s", (site_id,))
         if not cur.fetchone():
             raise HTTPException(400, "Invalid site_id")
 
@@ -155,12 +164,12 @@ def collect(event: CollectEvent, request: Request):
             INSERT INTO visitors (visitor_id, site_id)
             VALUES (%s, %s)
         """, (
-            event.visitorId, event.siteId,
-            event.visitorId, event.siteId,
-            event.visitorId, event.siteId
+            visitor_id, site_id,
+            visitor_id, site_id,
+            visitor_id, site_id
         ))
 
-        # event insert
+        # insert event
         cur.execute("""
         INSERT INTO events (
             site_id, visitor_id, event_type,
@@ -168,26 +177,27 @@ def collect(event: CollectEvent, request: Request):
             language, platform, screen_size, timezone
         ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
-            event.siteId,
-            event.visitorId,
+            site_id,
+            visitor_id,
             "page_view",
-            event.pageUrl,
-            event.referrer,
-            event.userAgent,
+            data.get("pageUrl"),
+            data.get("referrer"),
+            data.get("userAgent"),
             request.client.host,
-            event.language,
-            event.platform,
-            event.screenSize,
-            event.timezone
+            data.get("language"),
+            data.get("platform"),
+            data.get("screenSize"),
+            data.get("timezone")
         ))
 
         conn.commit()
+
     finally:
         conn.close()
 
     return {"status": "ok"}
 
-# ---------------- TRACK.JS ----------------
+
 @app.get("/track.js")
 def track_js():
     return Response("""
@@ -202,7 +212,7 @@ def track_js():
     localStorage.setItem("_va_vid", vid);
   }
 
-  navigator.sendBeacon("/collect", JSON.stringify({
+  navigator.sendBeacon("https://analytics-imvks.azurewebsites.net/collect", JSON.stringify({
     siteId,
     visitorId: vid,
     pageUrl: location.href,
@@ -216,3 +226,4 @@ def track_js():
   }));
 })();
 """, media_type="application/javascript")
+
