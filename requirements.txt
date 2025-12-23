@@ -1,8 +1,9 @@
 fastapi
-uvicorn[standard]
+uvicorn
 pyodbc
 pydantic
 python-dotenv
 httpx
 pytest
 python-multipart
+pymssql
