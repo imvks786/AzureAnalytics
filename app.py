@@ -1,48 +1,41 @@
 from fastapi import FastAPI, Request, HTTPException, Form
-from fastapi.responses import HTMLResponse, FileResponse, Response
+from fastapi.responses import HTMLResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
 import os
-import pyodbc
-from dotenv import load_dotenv
 import uuid
+import pymssql
+from dotenv import load_dotenv
 
 load_dotenv()
 
 app = FastAPI(title="Analytics API")
 
-# --- CORS ---
+# ---------------- CORS ----------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["POST", "GET"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- DB Connection ---
+# ---------------- DB CONNECTION ----------------
 def get_connection():
-    driver = os.getenv("AZURE_SQL_DRIVER", "ODBC Driver 18 for SQL Server")
-    server = os.getenv("AZURE_SQL_SERVER")
-    database = os.getenv("AZURE_SQL_DB")
-    uid = os.getenv("AZURE_SQL_USER")
-    pwd = os.getenv("AZURE_SQL_PASSWORD")
-    encrypt = os.getenv("AZURE_SQL_ENCRYPT", "yes")
-    trust_server_cert = os.getenv("AZURE_SQL_TRUST_SERVER_CERT", "no")
-
-    conn_str = (
-        f"DRIVER={{{driver}}};"
-        f"SERVER={server};DATABASE={database};UID={uid};PWD={pwd};"
-        f"Encrypt={encrypt};TrustServerCertificate={trust_server_cert};"
+    return pymssql.connect(
+        server=os.getenv("AZURE_SQL_SERVER"),   
+        user=os.getenv("AZURE_SQL_USER"),     
+        password=os.getenv("AZURE_SQL_PASSWORD"),
+        database=os.getenv("AZURE_SQL_DB"),
+        port=1433,
+        timeout=5
     )
-    return pyodbc.connect(conn_str)
 
-# --- Initialize DB ---
+# ---------------- INIT DB ----------------
 def init_db():
     conn = get_connection()
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
-        # Sites
         cur.execute("""
         IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sites' and xtype='U')
         CREATE TABLE sites (
@@ -53,7 +46,7 @@ def init_db():
             created_at DATETIME2 DEFAULT SYSUTCDATETIME()
         )
         """)
-        # Visitors
+
         cur.execute("""
         IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='visitors' and xtype='U')
         CREATE TABLE visitors (
@@ -65,7 +58,7 @@ def init_db():
             UNIQUE(visitor_id, site_id)
         )
         """)
-        # Events
+
         cur.execute("""
         IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='events' and xtype='U')
         CREATE TABLE events (
@@ -84,13 +77,14 @@ def init_db():
             created_at DATETIME2 DEFAULT SYSUTCDATETIME()
         )
         """)
+
         conn.commit()
     finally:
         conn.close()
 
 init_db()
 
-# --- Pydantic model ---
+# ---------------- MODELS ----------------
 class CollectEvent(BaseModel):
     siteId: str
     visitorId: str
@@ -103,90 +97,76 @@ class CollectEvent(BaseModel):
     timezone: str | None = None
     timestamp: str
 
-# --- Health check ---
+# ---------------- HEALTH ----------------
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-# --- Admin HTML page to add sites ---
+# ---------------- ADMIN UI ----------------
 @app.get("/admin", response_class=HTMLResponse)
 def admin_page():
-    html_content = """
-    <html>
-        <head><title>Add Site</title></head>
-        <body>
-            <h2>Add New Website</h2>
-            <form action="/admin" method="post">
-                <label>Site Name:</label><br>
-                <input type="text" name="site_name" required><br><br>
-                <label>Domain:</label><br>
-                <input type="text" name="domain" required><br><br>
-                <input type="submit" value="Add Site">
-            </form>
-        </body>
-    </html>
+    return """
+    <h2>Add Website</h2>
+    <form method="post">
+      <input name="site_name" placeholder="Site Name" required><br><br>
+      <input name="domain" placeholder="example.com" required><br><br>
+      <button>Add</button>
+    </form>
     """
-    return html_content
 
 @app.post("/admin", response_class=HTMLResponse)
 def add_site(site_name: str = Form(...), domain: str = Form(...)):
     site_id = uuid.uuid4().hex[:8]
     conn = get_connection()
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO sites (site_id, site_name, domain)
-            VALUES (?, ?, ?)
-        """, (site_id, site_name, domain))
+        cur.execute(
+            "INSERT INTO sites (site_id, site_name, domain) VALUES (%s, %s, %s)",
+            (site_id, site_name, domain)
+        )
         conn.commit()
     finally:
         conn.close()
+
     return f"""
-    <html>
-        <body>
-            <h2>✅ Site added successfully!</h2>
-            <p>Site Name: {site_name}</p>
-            <p>Domain: {domain}</p>
-            <p>Site ID: <b>{site_id}</b></p>
-            <p>Include in your JS tracker:</p>
-            <code>&lt;script src='https://yourdomain.com/track.js' data-site-id='{site_id}'&gt;&lt;/script&gt;</code>
-            <br><br>
-            <a href="/admin">Add another site</a>
-        </body>
-    </html>
+    <h3>✅ Site Added</h3>
+    <p>Site ID: <b>{site_id}</b></p>
+    <code>
+    &lt;script src="https://YOURDOMAIN/track.js" data-site-id="{site_id}"&gt;&lt;/script&gt;
+    </code>
     """
 
-# --- Collect endpoint ---
+# ---------------- COLLECT ----------------
 @app.post("/collect")
 def collect(event: CollectEvent, request: Request):
     conn = get_connection()
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
-        # Validate site
-        cur.execute("SELECT 1 FROM sites WHERE site_id = ?", (event.siteId,))
+        cur.execute("SELECT 1 FROM sites WHERE site_id=%s", (event.siteId,))
         if not cur.fetchone():
-            raise HTTPException(status_code=400, detail="Invalid site_id")
+            raise HTTPException(400, "Invalid site_id")
 
-        # Upsert visitor
+        # visitor upsert
         cur.execute("""
-        MERGE visitors AS target
-        USING (SELECT ? AS visitor_id, ? AS site_id) AS src
-        ON target.visitor_id = src.visitor_id AND target.site_id = src.site_id
-        WHEN MATCHED THEN
-            UPDATE SET last_seen = SYSUTCDATETIME()
-        WHEN NOT MATCHED THEN
-            INSERT (visitor_id, site_id, first_seen)
-            VALUES (src.visitor_id, src.site_id, SYSUTCDATETIME());
-        """, (event.visitorId, event.siteId))
+        IF EXISTS (SELECT 1 FROM visitors WHERE visitor_id=%s AND site_id=%s)
+            UPDATE visitors SET last_seen=SYSUTCDATETIME()
+            WHERE visitor_id=%s AND site_id=%s
+        ELSE
+            INSERT INTO visitors (visitor_id, site_id)
+            VALUES (%s, %s)
+        """, (
+            event.visitorId, event.siteId,
+            event.visitorId, event.siteId,
+            event.visitorId, event.siteId
+        ))
 
-        # Insert event
+        # event insert
         cur.execute("""
         INSERT INTO events (
             site_id, visitor_id, event_type,
             page_url, referrer, user_agent, ip_address,
             language, platform, screen_size, timezone
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
             event.siteId,
             event.visitorId,
@@ -200,39 +180,39 @@ def collect(event: CollectEvent, request: Request):
             event.screenSize,
             event.timezone
         ))
+
         conn.commit()
     finally:
         conn.close()
 
     return {"status": "ok"}
 
-# --- Serve track.js ---
+# ---------------- TRACK.JS ----------------
 @app.get("/track.js")
 def track_js():
-    js_content = """
+    return Response("""
 (function () {
-  const SCRIPT = document.currentScript;
-  const SITE_ID = SCRIPT.getAttribute("data-site-id");
-  if (!SITE_ID || navigator.doNotTrack === "1") return;
+  const s = document.currentScript;
+  const siteId = s.getAttribute("data-site-id");
+  if (!siteId) return;
+
   let vid = localStorage.getItem("_va_vid");
   if (!vid) {
     vid = crypto.randomUUID();
     localStorage.setItem("_va_vid", vid);
   }
-  const payload = {
-    siteId: SITE_ID,
+
+  navigator.sendBeacon("/collect", JSON.stringify({
+    siteId,
     visitorId: vid,
     pageUrl: location.href,
     referrer: document.referrer,
     userAgent: navigator.userAgent,
     language: navigator.language,
     platform: navigator.platform,
-    screenSize: `${screen.width}x${screen.height}`,
+    screenSize: screen.width + "x" + screen.height,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     timestamp: new Date().toISOString()
-  };
-  navigator.sendBeacon("/collect", JSON.stringify(payload));
+  }));
 })();
-    """
-    return Response(content=js_content, media_type="application/javascript")
-
+""", media_type="application/javascript")
