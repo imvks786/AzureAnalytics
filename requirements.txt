@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pyodbc
+pydantic
+python-dotenv
+httpx
+pytest
+python-multipart
