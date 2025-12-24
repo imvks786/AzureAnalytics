@@ -171,18 +171,13 @@ async def collect(request: Request):
         ))
 
         # insert event
-        extra_data = {}
-        if data.get("eventType") == "click":
-            extra_data["clicked_url"] = data.get("clicked_url")
-            extra_data["is_external"] = data.get("is_external")
-        
         cur.execute("""
         INSERT INTO events (
             site_id, visitor_id, event_type,
             page_url, referrer, user_agent, ip_address,
             language, platform, screen_size, timezone,
-            event_data
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            clicked_url, is_external
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
             site_id,
             visitor_id,
@@ -195,7 +190,8 @@ async def collect(request: Request):
             data.get("platform"),
             data.get("screenSize"),
             data.get("timezone"),
-            json.dumps(extra_data)
+            data.get("clicked_url"),      # <-- must exist
+            data.get("is_external")       # <-- must exist
         ))
         conn.commit()
 
@@ -216,6 +212,7 @@ def track_js():
             "Expires": "0"
         }
     )
+
 
 
 
