@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException, Form, Body
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime
@@ -200,30 +200,13 @@ async def collect(request: Request):
 
 @app.get("/track.js")
 def track_js():
-    return Response("""
-(function () {
-  const s = document.currentScript;
-  const siteId = s.getAttribute("data-site-id");
-  if (!siteId) return;
-
-  let vid = localStorage.getItem("_va_vid");
-  if (!vid) {
-    vid = crypto.randomUUID();
-    localStorage.setItem("_va_vid", vid);
-  }
-
-  navigator.sendBeacon("https://analytics-imvks.azurewebsites.net/collect", JSON.stringify({
-    siteId,
-    visitorId: vid,
-    pageUrl: location.href,
-    referrer: document.referrer,
-    userAgent: navigator.userAgent,
-    language: navigator.language,
-    platform: navigator.platform,
-    screenSize: screen.width + "x" + screen.height,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    timestamp: new Date().toISOString()
-  }));
-})();
-""", media_type="application/javascript")
+    return FileResponse(
+        path="static/track.js",
+        media_type="application/javascript",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
 
