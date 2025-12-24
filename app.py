@@ -171,24 +171,27 @@ async def collect(request: Request):
 
         # insert event
         cur.execute("""
-        INSERT INTO events (
-            site_id, visitor_id, event_type,
-            page_url, referrer, user_agent, ip_address,
-            language, platform, screen_size, timezone
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        """, (
-            site_id,
-            visitor_id,
-            "page_view",
-            data.get("pageUrl"),
-            data.get("referrer"),
-            data.get("userAgent"),
-            request.client.host,
-            data.get("language"),
-            data.get("platform"),
-            data.get("screenSize"),
-            data.get("timezone")
-        ))
+            INSERT INTO events (
+                site_id, visitor_id, event_type,
+                page_url, referrer, user_agent, ip_address,
+                language, platform, screen_size, timezone,
+                clicked_url, is_external
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                site_id,
+                visitor_id,
+                data.get("eventType", "page_view"),
+                data.get("pageUrl"),
+                data.get("referrer"),
+                data.get("userAgent"),
+                request.client.host,
+                data.get("language"),
+                data.get("platform"),
+                data.get("screenSize"),
+                data.get("timezone"),
+                data.get("clicked_url"),
+                data.get("is_external")
+            ))
 
         conn.commit()
 
@@ -209,4 +212,5 @@ def track_js():
             "Expires": "0"
         }
     )
+
 
