@@ -176,8 +176,8 @@ async def collect(request: Request):
                 site_id, visitor_id, event_type,
                 page_url, referrer, user_agent, ip_address,
                 language, platform, screen_size, timezone,
-                event_data
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                clicked_url, is_external
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (
                 site_id,
                 visitor_id,
@@ -190,10 +190,8 @@ async def collect(request: Request):
                 data.get("platform"),
                 data.get("screenSize"),
                 data.get("timezone"),
-                json.dumps({
-                    "clicked_url": data.get("clicked_url"),
-                    "is_external": data.get("is_external")
-                })
+                data.get("clicked_url"),
+                data.get("is_external")
             ))
         conn.commit()
 
@@ -214,6 +212,7 @@ def track_js():
             "Expires": "0"
         }
     )
+
 
 
 
