@@ -14,9 +14,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
-app = FastAPI(title="Analytics API")
 
+app = FastAPI(title="Analytics API")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 # ---------------- CORS ----------------
 app.add_middleware(
     CORSMiddleware,
@@ -221,6 +221,7 @@ def track_js():
             "Expires": "0"
         }
     )
+
 
 
 
