@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Request, HTTPException, Form, Body
 from fastapi.responses import HTMLResponse, Response, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from datetime import datetime
 import os
@@ -11,6 +13,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 app = FastAPI(title="Analytics API")
 
 # ---------------- CORS ----------------
@@ -102,6 +106,11 @@ class CollectEvent(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+@app.get("/", response_class=HTMLResponse)
+async def read_index(request: Request):
+    # Render index.html
+    return templates.TemplateResponse("index.html", {"request": request})
 
 # ---------------- ADMIN UI ----------------
 @app.get("/admin", response_class=HTMLResponse)
@@ -212,6 +221,7 @@ def track_js():
             "Expires": "0"
         }
     )
+
 
 
 
