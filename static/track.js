@@ -3,21 +3,54 @@
   const siteId = s && s.getAttribute("data-site-id");
   if (!siteId) return;
 
-  // ---- Visitor ID ----
+  const endpoint = "https://analytics-imvks.azurewebsites.net/collect";
+
+  // ===============================
+  // VISITOR ID (persistent)
+  // ===============================
   let vid = localStorage.getItem("_va_vid");
   if (!vid) {
     vid = crypto.randomUUID();
     localStorage.setItem("_va_vid", vid);
   }
 
-  const endpoint = "https://analytics-imvks.azurewebsites.net/collect";
+  // ===============================
+  // FIRST VISIT
+  // ===============================
+  const isFirstVisit = !localStorage.getItem("_va_first_visit");
+  if (isFirstVisit) {
+    localStorage.setItem("_va_first_visit", "1");
+  }
 
+  // ===============================
+  // SESSION MANAGEMENT
+  // ===============================
+  const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+  const now = Date.now();
+
+  let sessionId = localStorage.getItem("_va_session_id");
+  let lastActivity = localStorage.getItem("_va_last_activity");
+
+  let isNewSession = false;
+
+  if (!sessionId || !lastActivity || now - lastActivity > SESSION_TIMEOUT) {
+    sessionId = crypto.randomUUID();
+    localStorage.setItem("_va_session_id", sessionId);
+    isNewSession = true;
+  }
+
+  localStorage.setItem("_va_last_activity", now);
+
+  // ===============================
+  // SEND EVENT
+  // ===============================
   function sendEvent(type, extra = {}) {
     navigator.sendBeacon(
       endpoint,
       JSON.stringify({
         siteId,
         visitorId: vid,
+        sessionId,
         eventType: type,
         pageUrl: location.href,
         referrer: document.referrer,
@@ -32,12 +65,38 @@
   }
 
   // ===============================
-  // 1️⃣ PAGE VIEW (once)
+  // SESSION START
+  // ===============================
+  if (isNewSession) {
+    sendEvent("session_start");
+  }
+
+  // ===============================
+  // FIRST VISIT EVENT
+  // ===============================
+  if (isFirstVisit) {
+    sendEvent("first_visit");
+  }
+
+  // ===============================
+  // PAGE VIEW
   // ===============================
   sendEvent("page_view");
 
   // ===============================
-  // 2️⃣ SCROLL (100% once)
+  // USER ENGAGEMENT (10s)
+  // ===============================
+  let engaged = false;
+
+  setTimeout(() => {
+    if (!engaged) {
+      engaged = true;
+      sendEvent("user_engagement", { engagement_time_sec: 10 });
+    }
+  }, 10000);
+
+  // ===============================
+  // SCROLL (100% once)
   // ===============================
   let scrollSent = false;
 
@@ -54,7 +113,7 @@
   });
 
   // ===============================
-  // 3️⃣ LINK CLICK (auto)
+  // LINK CLICK
   // ===============================
   document.addEventListener("click", function (e) {
     const link = e.target.closest("a[href]");
@@ -64,6 +123,27 @@
       clicked_url: link.href,
       is_external: link.host !== location.host
     });
+  });
+
+  // ===============================
+  // FORM START
+  // ===============================
+  let formStarted = false;
+
+  document.addEventListener("focusin", function (e) {
+    if (formStarted) return;
+
+    const el = e.target;
+    if (
+      el.tagName === "INPUT" ||
+      el.tagName === "TEXTAREA" ||
+      el.tagName === "SELECT"
+    ) {
+      formStarted = true;
+      sendEvent("form_start", {
+        field_name: el.name || el.id || "unknown"
+      });
+    }
   });
 
 })();
