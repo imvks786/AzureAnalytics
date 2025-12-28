@@ -104,6 +104,32 @@ def init_db():
         )
         """)
 
+        cur.execute("""
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' and xtype='U')
+        CREATE TABLE users (
+            id INT IDENTITY PRIMARY KEY,
+            email NVARCHAR(200) UNIQUE,
+            name NVARCHAR(200),
+            picture NVARCHAR(500),
+            created_at DATETIME2 DEFAULT SYSUTCDATETIME()
+        )
+        """)
+        cur.execute("""
+        IF COL_LENGTH('sites', 'user_id') IS NULL
+            ALTER TABLE sites ADD user_id INT
+        """)
+        cur.execute("""
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.foreign_keys fk
+            JOIN sys.tables t ON fk.parent_object_id = t.object_id
+            WHERE t.name = 'sites' AND fk.name = 'FK_sites_users'
+        )
+        BEGIN
+            IF COL_LENGTH('sites', 'user_id') IS NOT NULL AND OBJECT_ID('users') IS NOT NULL
+                ALTER TABLE sites ADD CONSTRAINT FK_sites_users FOREIGN KEY (user_id) REFERENCES users(id)
+        END
+        """)
+
         conn.commit()
     finally:
         conn.close()
@@ -140,6 +166,57 @@ async def read_index(request: Request):
     # Render index.html
     return templates.TemplateResponse("index.html", {"request": request})
 
+#---------------- OAUTH ROUTES ----------------
+@app.get("/login/google")
+async def login_google(request: Request):
+    redirect_uri = request.url_for("auth_google")
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+@app.get("/auth/google/callback")
+async def auth_google(request: Request):
+    token = await oauth.google.authorize_access_token(request)
+    user = token.get("userinfo")
+
+    # Insert user into DB if not already present and capture the user id
+    user_id = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM users WHERE email=%s", (user["email"],))
+        row = cur.fetchone()
+        if row:
+            user_id = row[0]
+        else:
+            cur.execute(
+                "INSERT INTO users (email, name, picture) VALUES (%s, %s, %s)",
+                (user["email"], user["name"], user["picture"])
+            )
+            conn.commit()
+            cur.execute("SELECT id FROM users WHERE email=%s", (user["email"],))
+            fetched = cur.fetchone()
+            user_id = fetched[0] if fetched else None
+    except Exception as e:
+        # Don't block the auth flow if DB insert fails
+        print("Warning: failed to upsert user:", e)
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
+
+    # Save user info in session and include user_id inside the user object
+    request.session["user"] = {
+        "email": user["email"],
+        "name": user["name"],
+        "picture": user["picture"]
+    }
+    if user_id:
+        request.session["user"]["user_id"] = user_id
+        request.session["user_id"] = user_id
+
+    return RedirectResponse(url="/CreateSite")
+
+#---------------- Create Site UI ----------------
 @app.get("/CreateSite", response_class=HTMLResponse)
 async def read_index(request: Request):
     # Check session
@@ -153,32 +230,31 @@ async def read_index(request: Request):
         }
     )
 
-#---------------- OAUTH ROUTES ----------------
-@app.get("/login/google")
-async def login_google(request: Request):
-    redirect_uri = request.url_for("auth_google")
-    return await oauth.google.authorize_redirect(request, redirect_uri)
+#---------------- API ENDPOINTS ----------------
+@app.post("/getCode")
+def add_site(request: Request, site_name: str = Form(...), domain: str = Form(...), propertyName: str = Form(...)):
+    site_id = uuid.uuid4().hex[:8]
+    user_id = request.session["user"]["user_id"]
+    conn = get_connection()
+    cur = conn.cursor()
+    
+    try:
+        if not user_id:
+            # not authenticated — instruct client to re-login
+            raise HTTPException(status_code=401, detail="Not authenticated")
 
-@app.get("/auth/google/callback")
-async def auth_google(request: Request):
-    token = await oauth.google.authorize_access_token(request)
-    user = token.get("userinfo")
+        # Debug print
+        print("Inserting site with user_id:", user_id)
+        
+        cur.execute(
+            "INSERT INTO sites (site_id, site_name, domain, PropertyName, user_id) VALUES (%s, %s, %s, %s, %s)",
+            (site_id, site_name, domain, propertyName, user_id)
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
-    # Save user info in session
-    request.session["user"] = {
-        "email": user["email"],
-        "name": user["name"],
-        "picture": user["picture"]
-    }
-
-    return RedirectResponse(url="/CreateSite")
-
-
-@app.get("/logout")
-def logout(request: Request):
-    request.session.clear()
-    return {"message": "Logged out"}
-
+    return {"site_id": site_id,"user_id": user_id}
 
 # ---------------- Dashboard UI ----------------
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -186,28 +262,6 @@ def dashboard(request: Request):
     # Render index.html
     user = request.session.get("user")  
     return templates.TemplateResponse("dashboard.html", {"request": request, "user": user})
-
-
-
-
-
-#---------------- API ENDPOINTS ----------------
-@app.post("/getCode")
-def add_site(site_name: str = Form(...), domain: str = Form(...), propertyName: str = Form(...)):
-    site_id = uuid.uuid4().hex[:8]
-
-    conn = get_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute(
-            "INSERT INTO sites (site_id, site_name, domain, PropertyName) VALUES (%s, %s, %s, %s)",
-            (site_id, site_name, domain, propertyName)
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-    return {"site_id": site_id}
 
 #---------------- Event Collection ----------------
 @app.post("/collect")
@@ -272,6 +326,27 @@ async def collect(request: Request):
         conn.close()
 
     return {"status": "ok"}
+
+#---------------- Logout ----------------
+@app.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return {"message": "Logged out"}
+
+#---------------- Session debug ----------------
+@app.get("/session")
+def session_info(request: Request):
+    """Return all session data as JSON for debugging."""
+    try:
+        session_data = dict(request.session)
+    except Exception:
+        # request.session may not be serializable directly in some cases
+        session_data = {k: str(v) for k, v in request.session.items()}
+
+    # print to server console for quick debugging
+    print("Session dump:", session_data)
+
+    return {"session": session_data}
 
 #---------------- Serve track.js ----------------
 @app.get("/track.js")

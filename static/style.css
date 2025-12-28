@@ -11,56 +11,79 @@ body {
 }
 
 .navbar {
-    background-color: white;
-    border-bottom: 1px solid #e5e7eb;
-    padding: 1rem 1.5rem;
-}
-
-.navbar-content {
-    max-width: 1280px;
-    margin: 0 auto;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 0 30px;
+    height: 64px;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
 .navbar-left {
     display: flex;
     align-items: center;
-    gap: 2rem;
-}
-
-.menu-btn, .settings-btn {
-    background: none;
-    border: none;
-    color: #6b7280;
-    cursor: pointer;
-    padding: 0.5rem;
-}
-
-.logo-container {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    gap: 15px;
 }
 
 .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    font-weight: 500;
+    color: #202124;
+}
+
+.logo-icon {
     width: 32px;
     height: 32px;
-    background: linear-gradient(135deg, #3b82f6, #9333ea);
+    background: linear-gradient(135deg, #1a73e8 0%, #34a853 100%);
     border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
     font-weight: bold;
-    font-size: 0.875rem;
+    font-size: 18px;
 }
 
-.logo-text {
-    font-size: 1.25rem;
-    font-weight: 600;
+.navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
 }
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 20px;
+    transition: background 0.2s;
+}
+
+.user-profile:hover {
+    background: #f8f9fa;
+}
+
+.user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+}
+
+.user-name {
+    font-size: 14px;
+    color: #202124;
+    font-weight: 500;
+}
+
+
 
 .progress-section {
     background-color: white;

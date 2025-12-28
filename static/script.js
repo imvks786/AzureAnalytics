@@ -108,7 +108,7 @@ $(document).ready(function () {
         }
 
         $.ajax({
-            url: "https://analytics-imvks.azurewebsites.net/getCode",
+            url: "/getCode",
             type: "POST",
             data: {
                 site_name: siteName,
@@ -132,8 +132,12 @@ $(document).ready(function () {
                     showPage(3);
                 }
             },
-            error: function (err) {
-                console.error(err);
+            error: function (xhr) {
+                console.error(xhr);
+                if (xhr && xhr.status === 401) {
+                    alert("You're not authenticated. Please sign in with Google and try again.");
+                    return;
+                }
                 alert("Something went wrong");
             }
         });
