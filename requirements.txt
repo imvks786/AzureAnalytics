@@ -8,3 +8,6 @@ pytest
 python-multipart
 pymssql
 jinja2
+authlib
+itsdangerous
+starlette
