@@ -93,6 +93,10 @@ copyBtn.addEventListener('click', function() {
 });
 
 $(document).ready(function () {
+    $("#Dashboard").on("click", function () {
+        window.location.href = "/dashboard";
+    });
+
     $("#page2Continue").on("click", function () {
         const siteName = $("#site_name").val().trim();
         const domain = $("#domain").val().trim();

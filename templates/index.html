@@ -3,251 +3,385 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analytics Property Setup</title>
-    <link rel="stylesheet" href="/static/style.css" type="text/css">
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <title>Analytics - Real-Time Insights</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 0 30px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 20px;
+            font-weight: 500;
+            color: white;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #667eea;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .hero-section {
+            max-width: 1200px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .hero-left {
+            color: white;
+        }
+
+        .hero-left h1 {
+            font-size: 56px;
+            font-weight: 500;
+            line-height: 1.2;
+            margin-bottom: 20px;
+        }
+
+        .hero-left p {
+            font-size: 18px;
+            line-height: 1.6;
+            opacity: 0.9;
+            margin-bottom: 40px;
+        }
+
+        .features {
+            display: flex;
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .feature {
+            display: flex;
+            align-items: start;
+            gap: 12px;
+        }
+
+        .feature-icon {
+            width: 24px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .feature-text {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .hero-right {
+            display: flex;
+            justify-content: center;
+        }
+
+        .login-card {
+            background: white;
+            padding: 48px;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-card h2 {
+            font-size: 28px;
+            font-weight: 500;
+            color: #202124;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .login-card .subtitle {
+            color: #5f6368;
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .google-btn {
+            width: 100%;
+            background: white;
+            border: 1px solid #dadce0;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            color: #3c4043;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .google-btn:hover {
+            background: #f8f9fa;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .google-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 24px 0;
+            color: #5f6368;
+            font-size: 14px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e8eaed;
+        }
+
+        .benefits {
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid #e8eaed;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            color: #5f6368;
+            font-size: 14px;
+        }
+
+        .checkmark {
+            width: 20px;
+            height: 20px;
+            background: #e8f5e9;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #34a853;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        .footer {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 24px 30px;
+            color: white;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: white;
+        }
+
+        .footer-copyright {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+        }
+
+        @media (max-width: 968px) {
+            .hero-section {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .hero-left h1 {
+                font-size: 40px;
+            }
+
+            .features {
+                flex-direction: column;
+            }
+
+            .login-card {
+                padding: 32px;
+            }
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar">
-        <div class="navbar-content">
-            <div class="navbar-left">
-                <div class="logo-container">
-                    <div class="logo">GA</div>
-                    <span class="logo-text">Analytics</span>
-                </div>
-            </div>
+        <div class="logo">
+            <div class="logo-icon">A</div>
+            <span>Analytics</span>
+        </div>
+        <div class="nav-links">
+            <a href="#">Features</a>
+            <a href="#">Pricing</a>
+            <a href="#">Docs</a>
+            <a href="#">Contact</a>
         </div>
     </nav>
 
-    <div class="progress-section">
-        <div class="progress-container">
-            <div class="progress-steps">
-                <div class="step">
-                    <div class="step-circle active" id="step1Circle">1</div>
-                    <div class="step-label active" id="step1Label">Property creation</div>
-                </div>
-                <div class="progress-line"></div>
-                <div class="step">
-                    <div class="step-circle inactive" id="step2Circle">2</div>
-                    <div class="step-label inactive" id="step2Label">Data collection</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="main-content">
-        <div class="page active" id="page1">
-            <div class="page-header">
-                <h1 class="page-title">Create a property</h1>
-                <p class="page-description">
-                    To measure your web data, create a property. Each property that you create holds all your measurement data for any selection of websites that you choose.
-                </p>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Property details</h2>
-                </div>
-                <div class="card-body">
-                    <div class="form-group">
-                        <label class="form-label">
-                            Property name <span class="required">*</span>
-                        </label>
-                        <input type="text" class="form-input" id="propertyName" placeholder="Enter property name">
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Reporting time zone</label>
-                            <div style="display: flex; gap: 0.75rem;">
-                                <select class="form-select">
-                                    <option>India</option>
-                                </select>
-                                <select class="form-select">
-                                    <option>(GMT+05:30) India Time</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">Currency</label>
-                            <select class="form-select">
-                                <option>Indian Rupee (₹)</option>
-                            </select>
+        <div class="hero-section">
+            <div class="hero-left">
+                <h1>Real-Time Analytics Made Simple</h1>
+                <p>Track your website visitors, analyze user behavior, and make data-driven decisions with powerful real-time insights.</p>
+                
+                <div class="features">
+                    <div class="feature">
+                        <div class="feature-icon">⚡</div>
+                        <div class="feature-text">
+                            <strong>Real-Time Data</strong><br>
+                            See what's happening now
                         </div>
                     </div>
-                </div>
-            </div>
-            <div class="button-group">
-                <div></div>
-                <button class="btn btn-primary" id="page1Continue">
-                    <span>Create and Continue</span>
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-
-        <div class="page" id="page2">
-            <div class="page-header">
-                <h1 class="page-title">Set up data stream</h1>
-                <p class="page-description">
-                    Configure your web stream to start collecting data from your website
-                </p>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Set up your web stream</h2>
-                </div>
-                <div class="card-body">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Website URL</label>
-                            <div class="url-input-group">
-                                <select class="url-prefix">
-                                    <option>https://</option>
-                                    <option>http://</option>
-                                </select>
-                                <input type="text" class="form-input" id="domain" placeholder="yourdomain.com">
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">Stream name</label>
-                            <input type="text" class="form-input" id="site_name" placeholder="My Website">
-                        </div>
-                    </div>
-
-                    <div class="enhanced-box">
-                        <div class="enhanced-header">
-                            <div class="enhanced-title-group">
-                                <svg class="enhanced-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
-                                </svg>
-                                <h3 class="enhanced-title">Enhanced measurement</h3>
-                            </div>
-                            <div class="toggle active" id="enhancedToggle">
-                                <div class="toggle-circle"></div>
-                            </div>
-                        </div>
-
-                        <p class="enhanced-description">
-                            Automatically measure interactions and content on your sites in addition to standard page view measurement. Data from on-page elements such as links and embedded videos may be collected with relevant events. You must ensure that no personally identifiable information will be sent to Analytics account.
-                        </p>
-
-                        <div class="measuring-header">
-                            <span class="measuring-label">Measuring:</span>
-                        </div>
-
-                        <div class="events-container">
-                            <div class="event-badge">
-                                <div class="event-icon" style="background-color: #3b82f6;">
-                                    <svg viewBox="0 0 24 24">
-                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                        <circle cx="12" cy="12" r="3"/>
-                                    </svg>
-                                </div>
-                                <span class="event-name">Page views</span>
-                            </div>
-                            <div class="event-badge">
-                                <div class="event-icon" style="background-color: #10b981;">
-                                    <svg viewBox="0 0 24 24">
-                                        <path d="M3 3h7v7H3z"/>
-                                        <path d="M14 3h7v7h-7z"/>
-                                        <path d="M14 14h7v7h-7z"/>
-                                        <path d="M3 14h7v7H3z"/>
-                                    </svg>
-                                </div>
-                                <span class="event-name">Scrolls</span>
-                            </div>
-                            <div class="event-badge">
-                                <div class="event-icon" style="background-color: #14b8a6;">
-                                    <svg viewBox="0 0 24 24">
-                                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                                        <polyline points="15 3 21 3 21 9"/>
-                                        <line x1="10" y1="14" x2="21" y2="3"/>
-                                    </svg>
-                                </div>
-                                <span class="event-name">Outbound clicks</span>
-                            </div>
-                            <div class="event-badge">
-                                <div class="event-icon" style="background-color: #a855f7;">
-                                    <svg viewBox="0 0 24 24">
-                                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                                        <circle cx="8.5" cy="7" r="4"/>
-                                        <line x1="20" y1="8" x2="20" y2="14"/>
-                                        <line x1="23" y1="11" x2="17" y2="11"/>
-                                    </svg>
-                                </div>
-                                <span class="event-name">First visit</span>
-                            </div>
-                            <div class="event-badge">
-                                <div class="event-icon" style="background-color: #f97316;">
-                                    <svg viewBox="0 0 24 24">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                        <polyline points="14 2 14 8 20 8"/>
-                                    </svg>
-                                </div>
-                                <span class="event-name">Form submit</span>
-                            </div>
+                    <div class="feature">
+                        <div class="feature-icon">📊</div>
+                        <div class="feature-text">
+                            <strong>Visual Reports</strong><br>
+                            Beautiful dashboards
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="button-group">
-                <button class="btn btn-secondary" id="page2Back">Back</button>
-                <button class="btn btn-primary" id="page2Continue">
-                    <span>Create and Continue</span>
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-
-        <div class="page" id="page3">
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Installation instructions</h2>
-                    <button class="close-btn">
-                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <div class="tabs">
-                    <button class="tab active" id="tabManual">Install manually</button>
-                </div>
-
-                <div class="card-body">
-                    <p style="color: #374151; margin-bottom: 1rem;">
-                        Below is tag for this account. Copy and paste it in the code of every page of your website, immediately after the &lt;head&gt; element. Don't add more than one tag to each page.
-                    </p>
-
-                    <div class="code-container">
-                        <button class="copy-btn" id="copyBtn">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            <div class="hero-right">
+                <div class="login-card">
+                    <h2>Get Started</h2>
+                    <p class="subtitle">Sign in to access your analytics dashboard</p>
+                    
+                    <a href="/login/google" style="text-decoration: none;">
+                        <button class="google-btn">
+                            <svg class="google-icon" viewBox="0 0 24 24">
+                                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                             </svg>
+                            Sign in with Google
                         </button>
-                        <div class="code-block" id="GenTagForAccount">
+                    </a>
+
+                    <!-- <div class="divider">or</div> -->
+
+                    <div class="benefits">
+                        <div class="benefit-item">
+                            <div class="checkmark">✓</div>
+                            <span>Free to start, no credit card required</span>
+                        </div>
+                        <div class="benefit-item">
+                            <div class="checkmark">✓</div>
+                            <span>Real-time data tracking</span>
+                        </div>
+                        <div class="benefit-item">
+                            <div class="checkmark">✓</div>
+                            <span>Unlimited dashboards</span>
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="button-group">
-                <button class="btn btn-secondary" id="page3Back">Back</button>
-                <button class="btn btn-primary">Complete Setup</button>
             </div>
         </div>
     </div>
 
-    <script src="/static/script.js"></script>
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="#">About</a>
+                <a href="#">Privacy</a>
+                <a href="#">Terms</a>
+                <a href="#">Help Center</a>
+                <a href="#">Contact</a>
+            </div>
+            <div class="footer-copyright">
+                © 2024 Analytics Dashboard. All rights reserved.
+            </div>
+        </div>
+    </footer>
 </body>
 </html>

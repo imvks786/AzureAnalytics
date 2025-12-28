@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException, Form, Body
-from fastapi.responses import HTMLResponse, Response, FileResponse
+from fastapi.responses import HTMLResponse, Response, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +11,11 @@ import pymssql
 import json
 from dotenv import load_dotenv
 
+from authlib.integrations.starlette_client import OAuth
+from starlette.middleware.sessions import SessionMiddleware
+
+
+
 load_dotenv()
 
 templates = Jinja2Templates(directory="templates")
@@ -20,9 +25,21 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # ---------------- CORS ----------------
 app.add_middleware(
     CORSMiddleware,
+    SessionMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    secret_key="SUPER_SECRET_SESSION_KEY"
+)
+
+#---------------- OAUTH ----------------
+oauth = OAuth()
+oauth.register(
+    name="google",
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    client_kwargs={"scope": "openid email profile"}
 )
 
 # ---------------- DB CONNECTION ----------------
@@ -48,6 +65,7 @@ def init_db():
             site_id NVARCHAR(100) UNIQUE,
             site_name NVARCHAR(200),
             domain NVARCHAR(200),
+            PropertyName NVARCHAR(200),
             created_at DATETIME2 DEFAULT SYSUTCDATETIME()
         )
         """)
@@ -107,23 +125,57 @@ class CollectEvent(BaseModel):
 def health():
     return {"status": "ok"}
 
+# ---------------- INDEX UI ----------------
 @app.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
     # Render index.html
     return templates.TemplateResponse("index.html", {"request": request})
 
-# ---------------- ADMIN UI ----------------
-@app.get("/admin", response_class=HTMLResponse)
-def admin_page():
-    return """
-    <h2>Add Website</h2>
-    <form method="post">
-      <input name="site_name" placeholder="Site Name" required><br><br>
-      <input name="domain" placeholder="example.com" required><br><br>
-      <button>Add</button>
-    </form>
-    """
+@app.get("/CreateSite", response_class=HTMLResponse)
+async def read_index(request: Request):
+    # Render index.html
+    return templates.TemplateResponse("create_site.html", {"request": request})
 
+#---------------- OAUTH ROUTES ----------------
+@app.get("/login/google")
+async def login_google(request: Request):
+    redirect_uri = request.url_for("auth_google")
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+@app.get("/auth/google/callback")
+async def auth_google(request: Request):
+    token = await oauth.google.authorize_access_token(request)
+    user = token.get("userinfo")
+
+    # Save user info in session
+    request.session["user"] = {
+        "email": user["email"],
+        "name": user["name"],
+        "picture": user["picture"]
+    }
+
+    return RedirectResponse(url="/CreateSite")
+
+
+@app.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return {"message": "Logged out"}
+
+
+# ---------------- Dashboard UI ----------------
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard(request: Request):
+    # Render index.html
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+
+
+
+
+
+
+#---------------- API ENDPOINTS ----------------
 @app.post("/getCode")
 def add_site(site_name: str = Form(...), domain: str = Form(...), propertyName: str = Form(...)):
     site_id = uuid.uuid4().hex[:8]
@@ -141,6 +193,7 @@ def add_site(site_name: str = Form(...), domain: str = Form(...), propertyName: 
 
     return {"site_id": site_id}
 
+#---------------- Event Collection ----------------
 @app.post("/collect")
 async def collect(request: Request):
     data = await request.json()
@@ -204,7 +257,7 @@ async def collect(request: Request):
 
     return {"status": "ok"}
 
-
+#---------------- Serve track.js ----------------
 @app.get("/track.js")
 def track_js():
     return FileResponse(
@@ -217,10 +270,4 @@ def track_js():
         }
     )
 
-
-
-
-
-
-
-
+#---------------- Run the app ----------------

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Analytics Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <link rel="stylesheet" href="/static/dashboard.css" type="text/css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-left">
+            <div class="logo">
+                <div class="logo-icon">A</div>
+                <span>Analytics</span>
+            </div>
+        </div>
+        <div class="navbar-right">
+            <div class="user-profile">
+                <div class="user-avatar">JD</div>
+                <span class="user-name">John Doe</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="main-content">
+    <div class="header">
+        <h1><span class="pulse"></span>Real-Time Overview</h1>
+        <p class="subtitle">Last updated: <span id="lastUpdate"></span></p>
+    </div>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="label">Active Users Right Now</div>
+            <div class="value">
+                <span id="activeUsers">0</span>
+                <span class="change positive" id="userChange">+0%</span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="label">Page Views (Last 30 min)</div>
+            <div class="value">
+                <span id="pageViews">0</span>
+                <span class="change positive" id="viewChange">+0%</span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="label">Avg. Session Duration</div>
+            <div class="value">
+                <span id="avgDuration">0:00</span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="label">Bounce Rate</div>
+            <div class="value">
+                <span id="bounceRate">0%</span>
+                <span class="change negative" id="bounceChange">0%</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="charts-container">
+        <div class="chart-card">
+            <h3>Active Users (Last 30 Minutes)</h3>
+            <canvas id="lineChart"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>Traffic Sources</h3>
+            <canvas id="pieChart"></canvas>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <h3 style="margin-bottom: 16px;">Top Active Pages</h3>
+        <table id="pagesTable">
+            <thead>
+                <tr>
+                    <th>Page URL</th>
+                    <th>Active Users</th>
+                    <th>Views</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script src="/static/dashboard.js"></script>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="#">About</a>
+                <a href="#">Privacy</a>
+                <a href="#">Terms</a>
+                <a href="#">Help Center</a>
+                <a href="#">Contact</a>
+            </div>
+            <div class="footer-copyright">
+                © 2024 Analytics Dashboard. All rights reserved.
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
