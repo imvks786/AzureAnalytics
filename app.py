@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import uuid
 import pymssql
@@ -259,10 +259,26 @@ def add_site(request: Request, site_name: str = Form(...), domain: str = Form(..
 # ---------------- Dashboard UI ----------------
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
-    # Render index.html
-    user = request.session.get("user")  
-    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user})
+    user = request.session.get("user")
 
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # Fetch all sites for this user
+    cur.execute("SELECT site_name, domain FROM sites WHERE user_id=%s", (user["user_id"],))
+    fetched = cur.fetchall()  # returns list of tuples
+
+    # Convert to list of dicts for template
+    data = [{"site_name": row[0], "domain": row[1]} for row in fetched] if fetched else []
+
+    return templates.TemplateResponse(
+        "dashboard.html", 
+        {
+            "request": request,
+            "user": user,
+            "data": data
+        }
+    )
 #---------------- Event Collection ----------------
 @app.post("/collect")
 async def collect(request: Request):
@@ -327,6 +343,173 @@ async def collect(request: Request):
 
     return {"status": "ok"}
 
+#---------------- Realtime metrics ----------------
+@app.get("/api/realtime")
+def realtime_metrics(request: Request):
+    """Return aggregated realtime metrics for the current user's sites."""
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        # get site ids owned by this user
+        cur.execute("SELECT site_id FROM sites WHERE user_id=%s", (user_id,))
+        rows = cur.fetchall()
+        site_ids = [r[0] for r in rows]
+
+        if not site_ids:
+            return {
+                "activeUsers": 0,
+                "pageViews": 0,
+                "avgDuration": 0,
+                "bounceRate": 0,
+                "timeseries": {"labels": [], "values": []},
+                "trafficSources": {},
+                "topPages": []
+            }
+
+        placeholders = ",".join(["%s"] * len(site_ids))
+
+        # active users right now (last 5 minutes)
+        # sql = f"SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -5, SYSUTCDATETIME())"
+        sql = f"SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id IN ({placeholders})"
+        cur.execute(sql, tuple(site_ids))
+        active_users = cur.fetchone()[0] or 0
+
+        # page views last 30 minutes
+        # sql = f"SELECT COUNT(*) FROM events WHERE site_id IN ({placeholders}) AND event_type=%s AND created_at >= DATEADD(minute, -30, SYSUTCDATETIME())"
+        sql = f"SELECT COUNT(*) FROM events WHERE site_id IN ({placeholders}) AND event_type=%s"
+        params = tuple(site_ids) + ("page_view",)
+        cur.execute(sql, params)
+        page_views = cur.fetchone()[0] or 0
+
+        # average session duration in seconds (approx) over last 30 minutes
+        # sql = f"SELECT visitor_id, MIN(created_at) as min_ts, MAX(created_at) as max_ts FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -30, SYSUTCDATETIME()) GROUP BY visitor_id"
+        sql = f"SELECT visitor_id, MIN(created_at) as min_ts, MAX(created_at) as max_ts FROM events WHERE site_id IN ({placeholders}) GROUP BY visitor_id"
+        cur.execute(sql, tuple(site_ids))
+        sessions = cur.fetchall()
+        durations = []
+        for v in sessions:
+            min_ts = v[1]
+            max_ts = v[2]
+            if min_ts and max_ts:
+                diff = (max_ts - min_ts).total_seconds()
+                durations.append(diff)
+        avg_duration = int(sum(durations) / len(durations)) if durations else 0
+
+        # bounce rate (visitors with only 1 event in window)
+        total_visitors = len(sessions)
+        bounce_visitors = sum(1 for v in sessions if v and v[1] == v[2])
+        bounce_rate = round((bounce_visitors / total_visitors) * 100, 1) if total_visitors else 0
+
+        # timeseries - active users per minute for last 30 minutes
+        labels = []
+        values = []
+        now = datetime.utcnow()
+        for i in range(30, -1, -1):
+            start = now - timedelta(minutes=i)
+            end = start + timedelta(minutes=1)
+            # sql = f"SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id IN ({placeholders}) AND created_at >= %s AND created_at < %s"
+            sql = f"SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id IN ({placeholders})"
+            params = tuple(site_ids) + (start, end)
+            cur.execute(sql, params)
+            val = cur.fetchone()[0] or 0
+            labels.append(start.strftime('%H:%M'))
+            values.append(val)
+
+        # traffic sources (simple classification based on referrer)
+        sql = f"SELECT referrer, COUNT(*) as cnt FROM events WHERE site_id IN ({placeholders}) GROUP BY referrer"
+        cur.execute(sql, tuple(site_ids))
+        ref_rows = cur.fetchall()
+        sources = {"Direct": 0, "Organic": 0, "Social": 0, "Referral": 0, "Email": 0}
+        for r in ref_rows:
+            ref = r[0] or ''
+            cnt = r[1]
+            ref_low = ref.lower()
+            if not ref:
+                sources["Direct"] += cnt
+            elif any(k in ref_low for k in ["google", "bing", "yahoo"]):
+                sources["Organic"] += cnt
+            elif any(k in ref_low for k in ["facebook", "twitter", "instagram", "linkedin", "t.co"]):
+                sources["Social"] += cnt
+            elif "mailto:" in ref_low or "email" in ref_low:
+                sources["Email"] += cnt
+            else:
+                sources["Referral"] += cnt
+
+        # top pages
+        # sql = f"SELECT page_url, COUNT(*) as views, COUNT(DISTINCT visitor_id) as users FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -30, SYSUTCDATETIME()) GROUP BY page_url ORDER BY views DESC"
+        sql = f"SELECT page_url, COUNT(*) as views, COUNT(DISTINCT visitor_id) as users FROM events WHERE site_id IN ({placeholders}) GROUP BY page_url ORDER BY views DESC"
+        cur.execute(sql, tuple(site_ids))
+        pages = cur.fetchall()
+        top_pages = []
+        for p in pages[:10]:
+            top_pages.append({"url": p[0], "views": p[1], "users": p[2]})
+
+        return {
+            "activeUsers": active_users,
+            "pageViews": page_views,
+            "avgDuration": avg_duration,
+            "bounceRate": bounce_rate,
+            "timeseries": {"labels": labels, "values": values},
+            "trafficSources": sources,
+            "topPages": top_pages
+        }
+
+    finally:
+        conn.close()
+
+
+#---------------- Event counts by name ----------------
+@app.get("/api/event_counts")
+def event_counts(request: Request):
+    """Return counts of events grouped by event_type for user's sites. Accepts optional ?minutes=<n> (default 30)."""
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    minutes = 30
+    try:
+        if "minutes" in request.query_params:
+            minutes = int(request.query_params.get("minutes", 30))
+    except Exception:
+        minutes = 30
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT site_id FROM sites WHERE user_id=%s", (user_id,))
+        rows = cur.fetchall()
+        site_ids = [r[0] for r in rows]
+        if not site_ids:
+            return {"counts": []}
+
+        placeholders = ",".join(["%s"] * len(site_ids))
+        # sql = f"SELECT event_type, COUNT(*) as cnt FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -%s, SYSUTCDATETIME()) GROUP BY event_type ORDER BY cnt DESC"
+        sql = f"SELECT event_type, COUNT(*) as cnt FROM events WHERE site_id IN ({placeholders}) GROUP BY event_type ORDER BY cnt DESC"
+        params = tuple(site_ids) + (minutes,)
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+
+        # ensure common event types are present with zero count if missing
+        common = ["page_view", "click", "form_start", "scroll", "session_start", "user_engagement"]
+        counts = {r[0]: r[1] for r in rows}
+        result = []
+        # add existing counts first (ordered by count desc)
+        ordered = sorted(counts.items(), key=lambda x: -x[1])
+        for k, v in ordered:
+            result.append({"event": k, "count": v})
+        # then ensure common types exist in result
+        for c in common:
+            if c not in counts:
+                result.append({"event": c, "count": 0})
+
+        return {"counts": result}
+    finally:
+        conn.close()
 #---------------- Logout ----------------
 @app.get("/logout")
 def logout(request: Request):

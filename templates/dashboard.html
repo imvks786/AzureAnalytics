@@ -13,6 +13,12 @@
             <div class="logo">
                 <div class="logo-icon">A</div>
                 <span>Analytics</span>
+                >
+                <span>
+                    {% for site in data %}
+                        {{ site.site_name }} > {{ site.domain }}
+                    {% endfor %}
+                </span>
             </div>
         </div>
         <div class="navbar-right">
@@ -70,18 +76,24 @@
         </div>
     </div>
 
-    <div class="table-container">
-        <h3 style="margin-bottom: 16px;">Top Active Pages</h3>
-        <table id="pagesTable">
-            <thead>
-                <tr>
-                    <th>Page URL</th>
-                    <th>Active Users</th>
-                    <th>Views</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+    <div style="display: flex; gap: 20px;">
+        <div class="table-container" style="width: 70%;">
+            <h3 style="margin-bottom: 16px;">Top Active Pages</h3>
+            <table id="pagesTable">
+                <thead>
+                    <tr>
+                        <th>Page URL</th>
+                        <th>Active Users</th>
+                        <th>Views</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="chart-card events-card" style="width: 30%;">
+            <h3 style="margin-bottom: 16px;"><b>Event count by name (last 30 min)</b></h3>
+            <div id="eventsList" style="margin-top: 12px;"></div>
+        </div>
     </div>
 
     <script src="/static/dashboard.js"></script>

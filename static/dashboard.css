@@ -285,3 +285,57 @@ tr:hover {
         grid-template-columns: 1fr;
     }
 }
+
+/* Events card */
+.events-card h3 {
+    margin-bottom: 8px;
+}
+
+#eventsList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.event-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.event-name {
+    color: #202124;
+    font-weight: 500;
+    text-transform: lowercase;
+}
+
+.event-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.event-count {
+    font-weight: 600;
+    color: #202124;
+    min-width: 36px;
+    text-align: right;
+}
+
+.event-bar-wrapper {
+    width: 160px;
+    height: 6px;
+    background: #eef3fb;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.event-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #1a73e8, #34a853);
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}

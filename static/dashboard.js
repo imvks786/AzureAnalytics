@@ -1,17 +1,8 @@
-// Simulate real-time data
+// Placeholder for real-time data
 let timeData = [];
 let userCounts = [];
-let currentUsers = 127;
-let pageViewsCount = 1543;
 
-// Initialize time data
-for (let i = 30; i >= 0; i--) {
-    const time = new Date(Date.now() - i * 60000);
-    timeData.push(time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
-    userCounts.push(Math.floor(Math.random() * 50) + 80);
-}
-
-// Line Chart
+// Line Chart (initialized with empty data)
 const lineCtx = document.getElementById('lineChart').getContext('2d');
 const lineChart = new Chart(lineCtx, {
     type: 'line',
@@ -48,14 +39,14 @@ const lineChart = new Chart(lineCtx, {
     }
 });
 
-// Pie Chart
+// Pie Chart (empty data)
 const pieCtx = document.getElementById('pieChart').getContext('2d');
 const pieChart = new Chart(pieCtx, {
     type: 'doughnut',
     data: {
-        labels: ['Direct', 'Organic Search', 'Social', 'Referral', 'Email'],
+        labels: ['Direct', 'Organic', 'Social', 'Referral', 'Email'],
         datasets: [{
-            data: [35, 30, 15, 12, 8],
+            data: [0, 0, 0, 0, 0],
             backgroundColor: [
                 '#1a73e8',
                 '#34a853',
@@ -79,60 +70,132 @@ const pieChart = new Chart(pieCtx, {
 });
 
 // Update pages table
-const pages = [
-    { url: '/home', users: 45, views: 234 },
-    { url: '/products', users: 32, views: 189 },
-    { url: '/blog/article-1', users: 28, views: 156 },
-    { url: '/about', users: 15, views: 98 },
-    { url: '/contact', users: 7, views: 45 }
-];
-
-function updateTable() {
+function updateTableFromApi(pages) {
     const tbody = document.querySelector('#pagesTable tbody');
     tbody.innerHTML = '';
     pages.forEach(page => {
         const row = tbody.insertRow();
         row.innerHTML = `
-            <td>${page.url}</td>
+            <td>${page.url || '(unknown)'}</td>
             <td>${page.users}</td>
-            <td>${page.views} <span class="bar-graph" style="width: ${page.views / 3}px"></span></td>
+            <td>${page.views} <span class="bar-graph" style="width: ${Math.min(200, page.views) / 3}px"></span></td>
         `;
     });
 }
 
-// Update metrics
-function updateMetrics() {
-    const change = (Math.random() * 10 - 5).toFixed(1);
-    currentUsers += Math.floor(Math.random() * 10 - 5);
-    currentUsers = Math.max(50, Math.min(200, currentUsers));
-    
-    pageViewsCount += Math.floor(Math.random() * 20);
-    
-    document.getElementById('activeUsers').textContent = currentUsers;
-    document.getElementById('pageViews').textContent = pageViewsCount.toLocaleString();
-    document.getElementById('avgDuration').textContent = `${Math.floor(Math.random() * 3 + 2)}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`;
-    document.getElementById('bounceRate').textContent = `${(Math.random() * 20 + 35).toFixed(1)}%`;
+// Update metrics from API response
+function updateMetricsFromApi(data) {
+    document.getElementById('activeUsers').textContent = data.activeUsers || 0;
+    document.getElementById('pageViews').textContent = (data.pageViews || 0).toLocaleString();
+
+    // avgDuration is seconds -> format as m:ss
+    const d = Math.max(0, data.avgDuration || 0);
+    const mins = Math.floor(d / 60);
+    const secs = Math.floor(d % 60).toString().padStart(2, '0');
+    document.getElementById('avgDuration').textContent = `${mins}:${secs}`;
+
+    document.getElementById('bounceRate').textContent = `${(data.bounceRate || 0)}%`;
     document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
-    
+
+    // small change indicators (rudimentary)
     const userChangeEl = document.getElementById('userChange');
-    userChangeEl.textContent = `${change > 0 ? '+' : ''}${change}%`;
-    userChangeEl.className = `change ${change > 0 ? 'positive' : 'negative'}`;
-    
-    const viewChangeVal = (Math.random() * 15).toFixed(1);
-    document.getElementById('viewChange').textContent = `+${viewChangeVal}%`;
-    
+    userChangeEl.textContent = '+'; // server can provide deltas if desired
+    userChangeEl.className = `change positive`;
+
+    document.getElementById('viewChange').textContent = '+0%';
+
     // Update chart
-    timeData.shift();
-    userCounts.shift();
-    const now = new Date();
-    timeData.push(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
-    userCounts.push(currentUsers);
-    
-    lineChart.data.labels = timeData;
-    lineChart.data.datasets[0].data = userCounts;
-    lineChart.update('none');
+    if (data.timeseries && data.timeseries.labels) {
+        timeData = data.timeseries.labels;
+        userCounts = data.timeseries.values;
+        lineChart.data.labels = timeData;
+        lineChart.data.datasets[0].data = userCounts;
+        lineChart.update();
+    }
+
+    // Update pie chart
+    if (data.trafficSources) {
+        const keys = ['Direct', 'Organic', 'Social', 'Referral', 'Email'];
+        const counts = keys.map(k => data.trafficSources[k] || 0);
+        pieChart.data.datasets[0].data = counts;
+        pieChart.update();
+    }
+
+    // Update top pages
+    updateTableFromApi(data.topPages || []);
 }
 
-updateTable();
-updateMetrics();
-setInterval(updateMetrics, 3000);
+// Fetch event counts from server
+async function fetchEventCounts() {
+    try {
+        const res = await fetch('/api/event_counts?minutes=30', { credentials: 'same-origin' });
+        if (res.status === 401) {
+            console.warn('Not authenticated for event counts');
+            return;
+        }
+        if (!res.ok) {
+            console.error('Failed to fetch event counts', res.status);
+            return;
+        }
+        const json = await res.json();
+        const counts = json.counts || [];
+        const container = document.getElementById('eventsList');
+        if (!container) return;
+        container.innerHTML = '';
+        if (!counts.length) {
+            container.innerHTML = '<div style="color:#5f6368">No events in the selected window.</div>';
+            return;
+        }
+        const max = Math.max(...counts.map(c => c.count), 1);
+        counts.forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'event-row';
+            const name = document.createElement('div');
+            name.className = 'event-name';
+            name.textContent = item.event;
+            const right = document.createElement('div');
+            right.className = 'event-right';
+            const count = document.createElement('div');
+            count.className = 'event-count';
+            count.textContent = item.count;
+            const barWrapper = document.createElement('div');
+            barWrapper.className = 'event-bar-wrapper';
+            const bar = document.createElement('div');
+            bar.className = 'event-bar';
+            bar.style.width = `${Math.round((item.count / max) * 100)}%`;
+            barWrapper.appendChild(bar);
+            right.appendChild(count);
+            right.appendChild(barWrapper);
+            row.appendChild(name);
+            row.appendChild(right);
+            container.appendChild(row);
+        });
+    } catch (err) {
+        console.error('Error fetching event counts', err);
+    }
+}
+
+// Fetch realtime data from server (and event counts)
+async function fetchRealtime() {
+    try {
+        const res = await fetch('/api/realtime', { credentials: 'same-origin' });
+        if (res.status === 401) {
+            alert("Not authenticated. Please sign in and refresh the page.");
+            return;
+        }
+        if (!res.ok) {
+            console.error('Failed to fetch realtime data', res.status);
+            return;
+        }
+        const data = await res.json();
+        updateMetricsFromApi(data);
+        // also fetch event counts
+        fetchEventCounts();
+    } catch (err) {
+        console.error('Error fetching realtime data', err);
+    }
+}
+
+// initial load and periodic refresh every 60s
+fetchRealtime();
+//setInterval(fetchRealtime, 60000);
