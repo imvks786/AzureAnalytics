@@ -124,27 +124,22 @@ def admin_page():
     </form>
     """
 
-@app.post("/admin", response_class=HTMLResponse)
-def add_site(site_name: str = Form(...), domain: str = Form(...)):
+@app.post("/getCode")
+def add_site(site_name: str = Form(...), domain: str = Form(...), propertyName: str = Form(...)):
     site_id = uuid.uuid4().hex[:8]
+
     conn = get_connection()
     cur = conn.cursor()
     try:
         cur.execute(
-            "INSERT INTO sites (site_id, site_name, domain) VALUES (%s, %s, %s)",
-            (site_id, site_name, domain)
+            "INSERT INTO sites (site_id, site_name, domain, PropertyName) VALUES (%s, %s, %s, %s)",
+            (site_id, site_name, domain, propertyName)
         )
         conn.commit()
     finally:
         conn.close()
 
-    return f"""
-    <h3>✅ Site Added</h3>
-    <p>Site ID: <b>{site_id}</b></p>
-    <code>
-    &lt;script src="https://analytics-imvks.azurewebsites.net/track.js" data-site-id="{site_id}"&gt;&lt;/script&gt;
-    </code>
-    """
+    return {"site_id": site_id}
 
 @app.post("/collect")
 async def collect(request: Request):

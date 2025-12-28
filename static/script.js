@@ -8,9 +8,7 @@ const page3Back = document.getElementById('page3Back');
 const propertyNameInput = document.getElementById('propertyName');
 const enhancedToggle = document.getElementById('enhancedToggle');
 const copyBtn = document.getElementById('copyBtn');
-const clearUrlBtn = document.getElementById('clearUrlBtn');
 const testUrlInput = document.getElementById('testUrl');
-const tabBuilder = document.getElementById('tabBuilder');
 const tabManual = document.getElementById('tabManual');
 
 function showPage(pageNum) {
@@ -65,10 +63,6 @@ page1Continue.addEventListener('click', function() {
     }
 });
 
-page2Continue.addEventListener('click', function() {
-    showPage(3);
-});
-
 page2Back.addEventListener('click', function() {
     showPage(1);
 });
@@ -98,16 +92,46 @@ copyBtn.addEventListener('click', function() {
     });
 });
 
-clearUrlBtn.addEventListener('click', function() {
-    testUrlInput.value = '';
-});
+$(document).ready(function () {
+    $("#page2Continue").on("click", function () {
+        const siteName = $("#site_name").val().trim();
+        const domain = $("#domain").val().trim();
+        const propertyName = $("#propertyName").val().trim();
 
-tabBuilder.addEventListener('click', function() {
-    tabManual.classList.remove('active');
-    tabBuilder.classList.add('active');
-});
+        if (!siteName || !domain) {
+            alert("Please fill all fields");
+            return;
+        }
 
-tabManual.addEventListener('click', function() {
-    tabBuilder.classList.remove('active');
-    tabManual.classList.add('active');
+        $.ajax({
+            url: "https://analytics-imvks.azurewebsites.net/getCode",
+            type: "POST",
+            data: {
+                site_name: siteName,
+                domain: domain,
+                propertyName: propertyName
+            },
+            success: function (res) {
+                if(!res || !res.site_id) {
+                    alert("Invalid response from server");
+                    return;
+                }else{
+                    const siteId = res.site_id;
+
+                    $("#GenTagForAccount").html(`
+                        <code>
+                        &lt;script src="https://analytics-imvks.azurewebsites.net/track.js"
+                        data-site-id="${siteId}"&gt;&lt;/script&gt;
+                        </code>
+                    `);
+                    
+                    showPage(3);
+                }
+            },
+            error: function (err) {
+                console.error(err);
+                alert("Something went wrong");
+            }
+        });
+    });
 });
