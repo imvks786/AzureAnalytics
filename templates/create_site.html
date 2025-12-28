@@ -16,6 +16,26 @@
                     <span class="logo-text">Analytics</span>
                 </div>
             </div>
+            <div class="navbar-right">
+                <span class="account-name">{{ user.name }}</span>
+                {% if user %}
+                    <div class="profile" id="profileMenu" aria-haspopup="true">
+                        <img src="{{ user.picture }}" alt="Profile Picture" class="profile-img" />
+                        <div class="profile-dropdown" id="profileDropdown" aria-hidden="true">
+                            <div class="profile-info">
+                                <div class="profile-name">{{ user.name }}</div>
+                                <div class="profile-email">{{ user.email }}</div>
+                            </div>
+                            <div class="profile-actions">
+                                <a href="/logout" class="logout-btn">Logout</a>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <p>You are not logged in.</p>
+                    <a href="/login/google"><button>Sign in with Google</button></a>
+                {% endif %}
+            </div>
         </div>
     </nav>
 

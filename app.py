@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, Form, Body
+from fastapi import FastAPI, Request, HTTPException, Form, Body, Depends
 from fastapi.responses import HTMLResponse, Response, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
@@ -10,11 +10,8 @@ import uuid
 import pymssql
 import json
 from dotenv import load_dotenv
-
 from authlib.integrations.starlette_client import OAuth
 from starlette.middleware.sessions import SessionMiddleware
-
-
 
 load_dotenv()
 
@@ -23,12 +20,18 @@ templates = Jinja2Templates(directory="templates")
 app = FastAPI(title="Analytics API")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 # ---------------- CORS ----------------
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    SessionMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
+)
+
+# Session
+app.add_middleware(
+    SessionMiddleware,
     secret_key="SUPER_SECRET_SESSION_KEY"
 )
 
@@ -107,6 +110,12 @@ def init_db():
 
 init_db()
 
+def get_current_user(request: Request):
+    user = request.session.get("user")
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user
+
 # ---------------- MODELS ----------------
 class CollectEvent(BaseModel):
     siteId: str
@@ -133,8 +142,16 @@ async def read_index(request: Request):
 
 @app.get("/CreateSite", response_class=HTMLResponse)
 async def read_index(request: Request):
-    # Render index.html
-    return templates.TemplateResponse("create_site.html", {"request": request})
+    # Check session
+    user = request.session.get("user")  
+    # user saved in session after Google login
+    return templates.TemplateResponse(
+        "create_site.html",
+        {
+            "request": request,
+            "user": user  # pass user info to template
+        }
+    )
 
 #---------------- OAUTH ROUTES ----------------
 @app.get("/login/google")
@@ -167,9 +184,8 @@ def logout(request: Request):
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     # Render index.html
-    return templates.TemplateResponse("dashboard.html", {"request": request})
-
-
+    user = request.session.get("user")  
+    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user})
 
 
 

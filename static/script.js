@@ -138,4 +138,22 @@ $(document).ready(function () {
             }
         });
     });
+
+    // Profile dropdown toggle
+    $("#profileMenu").on("click", function (e) {
+        e.stopPropagation();
+        $(this).toggleClass("open");
+        $("#profileDropdown").toggle();
+    });
+
+    // Stop clicks inside dropdown from closing it
+    $("#profileDropdown").on("click", function (e) {
+        e.stopPropagation();
+    });
+
+    // Close dropdown when clicking outside
+    $(document).on("click", function () {
+        $("#profileMenu").removeClass("open");
+        $("#profileDropdown").hide();
+    });
 });
