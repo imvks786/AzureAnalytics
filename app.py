@@ -170,6 +170,9 @@ async def read_index(request: Request):
 @app.get("/login/google")
 async def login_google(request: Request):
     redirect_uri = request.url_for("auth_google")
+    GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
+    if GOOGLE_REDIRECT_URI:
+        redirect_uri = GOOGLE_REDIRECT_URI
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 @app.get("/auth/google/callback")
