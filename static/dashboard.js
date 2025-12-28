@@ -125,10 +125,78 @@ function updateMetricsFromApi(data) {
     updateTableFromApi(data.topPages || []);
 }
 
-// Fetch event counts from server
+let selectedSiteId = localStorage.getItem('selectedSiteId') || null;
+
+function initSiteSelector() {
+    const btn = document.getElementById('siteButton');
+    const dropdown = document.getElementById('siteDropdown');
+    if (!btn || !dropdown) return;
+
+    // open/close toggle
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        dropdown.classList.toggle('open');
+    });
+
+    // item click
+    dropdown.querySelectorAll('.site-item').forEach(item => {
+        item.addEventListener('click', function () {
+            const siteId = this.getAttribute('data-site-id');
+            const name = this.querySelector('.site-item-name')?.textContent || siteId;
+            // set selection (empty siteId means "All sites")
+            if (!siteId) {
+                selectedSiteId = null;
+                localStorage.removeItem('selectedSiteId');
+            } else {
+                selectedSiteId = siteId;
+                localStorage.setItem('selectedSiteId', siteId);
+            }
+            document.getElementById('siteButton').innerHTML = `${name} <span class="caret">▾</span>`;
+            dropdown.classList.remove('open');
+            // refresh data for selected site
+            fetchRealtime();
+            fetchEventCounts();
+        });
+    });
+
+    // click outside to close
+    document.addEventListener('click', function () {
+        dropdown.classList.remove('open');
+    });
+
+    // set initial text
+    const items = dropdown.querySelectorAll('.site-item');
+    if (!selectedSiteId && items.length) {
+        // default to first (prefer "All sites" if present)
+        const first = items[0];
+        const firstId = first.getAttribute('data-site-id');
+        if (!firstId) {
+            selectedSiteId = null;
+            localStorage.removeItem('selectedSiteId');
+        } else {
+            selectedSiteId = firstId;
+            localStorage.setItem('selectedSiteId', selectedSiteId);
+        }
+        const name = first.querySelector('.site-item-name')?.textContent || (selectedSiteId || 'All sites');
+        document.getElementById('siteButton').innerHTML = `${name} <span class="caret">▾</span>`;
+    } else if (selectedSiteId) {
+        const selectedEl = dropdown.querySelector(`.site-item[data-site-id="${selectedSiteId}"]`);
+        if (selectedEl) {
+            const name = selectedEl.querySelector('.site-item-name')?.textContent || selectedSiteId;
+            document.getElementById('siteButton').innerHTML = `${name} <span class="caret">▾</span>`;
+        }
+    } else if (!selectedSiteId && items.length) {
+        // fallback to all sites label
+        document.getElementById('siteButton').innerHTML = `All sites <span class="caret">▾</span>`;
+    }
+}
+
+// Fetch event counts from server (uses selectedSiteId if set)
 async function fetchEventCounts() {
     try {
-        const res = await fetch('/api/event_counts?minutes=30', { credentials: 'same-origin' });
+        let url = '/api/event_counts?minutes=30';
+        if (selectedSiteId) url += `&site_id=${encodeURIComponent(selectedSiteId)}`;
+        const res = await fetch(url, { credentials: 'same-origin' });
         if (res.status === 401) {
             console.warn('Not authenticated for event counts');
             return;
@@ -175,10 +243,22 @@ async function fetchEventCounts() {
     }
 }
 
+// call init on load
+window.addEventListener('DOMContentLoaded', function () {
+    initSiteSelector();
+    // initial load
+    fetchRealtime();
+    fetchEventCounts();
+    // refresh every minute
+    setInterval(fetchRealtime, 60000);
+});
+
 // Fetch realtime data from server (and event counts)
 async function fetchRealtime() {
     try {
-        const res = await fetch('/api/realtime', { credentials: 'same-origin' });
+        let url = '/api/realtime';
+        if (selectedSiteId) url += `?site_id=${encodeURIComponent(selectedSiteId)}`;
+        const res = await fetch(url, { credentials: 'same-origin' });
         if (res.status === 401) {
             alert("Not authenticated. Please sign in and refresh the page.");
             return;
@@ -195,7 +275,3 @@ async function fetchRealtime() {
         console.error('Error fetching realtime data', err);
     }
 }
-
-// initial load and periodic refresh every 60s
-fetchRealtime();
-//setInterval(fetchRealtime, 60000);

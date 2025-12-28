@@ -268,11 +268,11 @@ def dashboard(request: Request):
     cur = conn.cursor()
 
     # Fetch all sites for this user
-    cur.execute("SELECT site_name, domain FROM sites WHERE user_id=%s", (user["user_id"],))
+    cur.execute("SELECT site_name, domain, site_id FROM sites WHERE user_id=%s", (user["user_id"],))
     fetched = cur.fetchall()  # returns list of tuples
 
     # Convert to list of dicts for template
-    data = [{"site_name": row[0], "domain": row[1]} for row in fetched] if fetched else []
+    data = [{"site_name": row[0], "domain": row[1], "site_id": row[2]} for row in fetched] if fetched else []
 
     return templates.TemplateResponse(
         "dashboard.html", 
@@ -363,6 +363,13 @@ def realtime_metrics(request: Request):
         rows = cur.fetchall()
         site_ids = [r[0] for r in rows]
 
+        # allow optional site_id filter (validate it belongs to this user)
+        site_param = request.query_params.get("site_id")
+        if site_param:
+            if site_param not in site_ids:
+                raise HTTPException(status_code=400, detail="Invalid site_id")
+            site_ids = [site_param]
+
         if not site_ids:
             return {
                 "activeUsers": 0,
@@ -377,21 +384,18 @@ def realtime_metrics(request: Request):
         placeholders = ",".join(["%s"] * len(site_ids))
 
         # active users right now (last 5 minutes)
-        # sql = f"SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -5, SYSUTCDATETIME())"
-        sql = f"SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id IN ({placeholders})"
+        sql = f"SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -5, SYSUTCDATETIME())"
         cur.execute(sql, tuple(site_ids))
         active_users = cur.fetchone()[0] or 0
 
         # page views last 30 minutes
-        # sql = f"SELECT COUNT(*) FROM events WHERE site_id IN ({placeholders}) AND event_type=%s AND created_at >= DATEADD(minute, -30, SYSUTCDATETIME())"
-        sql = f"SELECT COUNT(*) FROM events WHERE site_id IN ({placeholders}) AND event_type=%s"
+        sql = f"SELECT COUNT(*) FROM events WHERE site_id IN ({placeholders}) AND event_type=%s AND created_at >= DATEADD(minute, -30, SYSUTCDATETIME())"
         params = tuple(site_ids) + ("page_view",)
         cur.execute(sql, params)
         page_views = cur.fetchone()[0] or 0
 
         # average session duration in seconds (approx) over last 30 minutes
-        # sql = f"SELECT visitor_id, MIN(created_at) as min_ts, MAX(created_at) as max_ts FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -30, SYSUTCDATETIME()) GROUP BY visitor_id"
-        sql = f"SELECT visitor_id, MIN(created_at) as min_ts, MAX(created_at) as max_ts FROM events WHERE site_id IN ({placeholders}) GROUP BY visitor_id"
+        sql = f"SELECT visitor_id, MIN(created_at) as min_ts, MAX(created_at) as max_ts FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -30, SYSUTCDATETIME()) GROUP BY visitor_id"
         cur.execute(sql, tuple(site_ids))
         sessions = cur.fetchall()
         durations = []
@@ -415,16 +419,15 @@ def realtime_metrics(request: Request):
         for i in range(30, -1, -1):
             start = now - timedelta(minutes=i)
             end = start + timedelta(minutes=1)
-            # sql = f"SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id IN ({placeholders}) AND created_at >= %s AND created_at < %s"
-            sql = f"SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id IN ({placeholders})"
+            sql = f"SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id IN ({placeholders}) AND created_at >= %s AND created_at < %s"
             params = tuple(site_ids) + (start, end)
             cur.execute(sql, params)
             val = cur.fetchone()[0] or 0
             labels.append(start.strftime('%H:%M'))
             values.append(val)
 
-        # traffic sources (simple classification based on referrer)
-        sql = f"SELECT referrer, COUNT(*) as cnt FROM events WHERE site_id IN ({placeholders}) GROUP BY referrer"
+        # traffic sources (simple classification based on referrer, last 30 minutes)
+        sql = f"SELECT referrer, COUNT(*) as cnt FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -30, SYSUTCDATETIME()) GROUP BY referrer"
         cur.execute(sql, tuple(site_ids))
         ref_rows = cur.fetchall()
         sources = {"Direct": 0, "Organic": 0, "Social": 0, "Referral": 0, "Email": 0}
@@ -443,9 +446,8 @@ def realtime_metrics(request: Request):
             else:
                 sources["Referral"] += cnt
 
-        # top pages
-        # sql = f"SELECT page_url, COUNT(*) as views, COUNT(DISTINCT visitor_id) as users FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -30, SYSUTCDATETIME()) GROUP BY page_url ORDER BY views DESC"
-        sql = f"SELECT page_url, COUNT(*) as views, COUNT(DISTINCT visitor_id) as users FROM events WHERE site_id IN ({placeholders}) GROUP BY page_url ORDER BY views DESC"
+        # top pages (last 30 minutes)
+        sql = f"SELECT page_url, COUNT(*) as views, COUNT(DISTINCT visitor_id) as users FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -30, SYSUTCDATETIME()) GROUP BY page_url ORDER BY views DESC"
         cur.execute(sql, tuple(site_ids))
         pages = cur.fetchall()
         top_pages = []
@@ -490,9 +492,15 @@ def event_counts(request: Request):
         if not site_ids:
             return {"counts": []}
 
+        # allow optional site filter via query param
+        site_param = request.query_params.get("site_id")
+        if site_param:
+            if site_param not in site_ids:
+                raise HTTPException(status_code=400, detail="Invalid site_id")
+            site_ids = [site_param]
+
         placeholders = ",".join(["%s"] * len(site_ids))
-        # sql = f"SELECT event_type, COUNT(*) as cnt FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -%s, SYSUTCDATETIME()) GROUP BY event_type ORDER BY cnt DESC"
-        sql = f"SELECT event_type, COUNT(*) as cnt FROM events WHERE site_id IN ({placeholders}) GROUP BY event_type ORDER BY cnt DESC"
+        sql = f"SELECT event_type, COUNT(*) as cnt FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -%s, SYSUTCDATETIME()) GROUP BY event_type ORDER BY cnt DESC"
         params = tuple(site_ids) + (minutes,)
         cur.execute(sql, params)
         rows = cur.fetchall()
