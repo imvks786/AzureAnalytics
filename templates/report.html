@@ -7,21 +7,7 @@
     <link rel="stylesheet" href="/static/dashboard.css" type="text/css">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="navbar-left">
-            <button id="sidebarToggle" class="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
-            <div class="logo">
-                <div class="logo-icon">A</div>
-                <span>Analytics</span>
-            </div>
-        </div>
-        <div class="navbar-right">
-            <div class="user-profile">
-                <img src="{{ user.picture }}" alt="Profile Picture" class="user-avatar" />
-                <span class="user-name" data-id="{{ user.user_id }}">{{ user.name }}</span>
-            </div>
-        </div>
-    </nav>
+    {% include "navbar.html" %}
 
     <div class="app-body">
         <aside class="sidebar" id="sidebar" aria-hidden="false">
@@ -98,5 +84,7 @@
     </div>
 
     <script src="/static/dashboard.js"></script>
+
+    {% include "footer.html" %}
 </body>
 </html>

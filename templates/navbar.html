@@ -1,0 +1,34 @@
+<nav class="navbar">
+    <div class="navbar-left">
+        <button id="sidebarToggle" class="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
+        <div class="logo">
+            <div class="logo-icon">A</div>
+            <span>Analytics</span>
+        </div>
+    </div>
+    <div class="navbar-right">
+        <div class="site-selector" id="siteSelector">
+            <button class="site-button" id="siteButton">All accounts <span class="caret">▾</span></button>
+            <div class="site-dropdown" id="siteDropdown" aria-hidden="true">
+                {% if data and data|length > 0 %}                        <div class="site-item" data-site-id="">
+                        <div class="site-item-name">All sites</div>
+                        <div class="site-item-domain">Show aggregated data</div>
+                    </div>                        {% for s in data %}
+                    <div class="site-item" data-site-id="{{ s.site_id }}">
+                        <div class="site-item-name">{{ s.site_name }}</div>
+                        <div class="site-item-domain">{{ s.domain }}</div>
+                        <div class="site-item-id">{{ s.site_id }}</div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="site-empty">No sites yet</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="user-profile">
+            <img src="{{ user.picture }}" alt="Profile Picture" class="user-avatar" />
+            <span class="user-name" data-id="{{ user.user_id }}">{{ user.name }}</span>
+        </div>
+    </div> 
+</nav>
