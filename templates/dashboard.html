@@ -10,6 +10,7 @@
 <body>
     <nav class="navbar">
         <div class="navbar-left">
+            <button id="sidebarToggle" class="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
             <div class="logo">
                 <div class="logo-icon">A</div>
                 <span>Analytics</span>
@@ -42,8 +43,30 @@
         </div> 
     </nav>
 
-    <div class="main-content">
-    <div class="header">
+    <div class="app-body">
+        <aside class="sidebar" id="sidebar" aria-hidden="false">
+            <div class="sidebar-top">
+                <div class="sidebar-brand">
+                    <div class="logo-icon">A</div>
+                    <div class="brand-text">Analytics</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a class="nav-item active" href="#">Overview</a>
+                <a class="nav-item" href="#">Realtime</a>
+                <a class="nav-item" href="#">Reports</a>
+                <div class="nav-divider"></div>
+                <a class="nav-item" href="#">Audience</a>
+                <a class="nav-item" href="#">Acquisition</a>
+                <a class="nav-item" href="#">Behavior</a>
+                <a class="nav-item" href="#">Conversions</a>
+                <div class="nav-divider"></div>
+                <a class="nav-item" href="#">Settings</a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+        <div class="header">
         <h1><span class="pulse"></span>Real-Time Overview</h1>
         <p class="subtitle">Last updated: <span id="lastUpdate"></span></p>
     </div>
@@ -110,6 +133,7 @@
     </div>
 
     <script src="/static/dashboard.js"></script>
+    </main>
     </div>
 
     <footer class="footer">

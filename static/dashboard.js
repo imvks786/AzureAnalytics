@@ -246,6 +246,7 @@ async function fetchEventCounts() {
 // call init on load
 window.addEventListener('DOMContentLoaded', function () {
     initSiteSelector();
+    initSidebarToggle();
     // initial load
     fetchRealtime();
     fetchEventCounts();
@@ -274,4 +275,29 @@ async function fetchRealtime() {
     } catch (err) {
         console.error('Error fetching realtime data', err);
     }
+}
+
+// Sidebar toggle init and persistence
+function initSidebarToggle() {
+    const btn = document.getElementById('sidebarToggle');
+    const sidebar = document.getElementById('sidebar');
+    if (!btn || !sidebar) return;
+
+    // restore state
+    const collapsed = localStorage.getItem('sidebarCollapsed') === '1';
+    if (collapsed) sidebar.classList.add('collapsed');
+
+    btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        sidebar.classList.toggle('collapsed');
+        // persist
+        const isCollapsed = sidebar.classList.contains('collapsed');
+        localStorage.setItem('sidebarCollapsed', isCollapsed ? '1' : '0');
+    });
+
+    // On small screens allow toggling visibility by clicking outside
+    document.addEventListener('click', function (ev) {
+        if (window.innerWidth > 880) return;
+        if (!sidebar.classList.contains('hidden')) return; // only when hidden flag used
+    });
 }
