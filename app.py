@@ -282,6 +282,47 @@ def dashboard(request: Request):
             "data": data
         }
     )
+
+
+# ---------------- Reports UI ----------------
+@app.get("/reports/referrers", response_class=HTMLResponse)
+def report_referrers(request: Request):
+    user = request.session.get("user")
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    # fetch sites for selector
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT site_name, domain, site_id FROM sites WHERE user_id=%s", (user_id,))
+        rows = cur.fetchall()
+        sites = [{"site_name": r[0], "domain": r[1], "site_id": r[2]} for r in rows] if rows else []
+
+        # optional site_id param (required to view referrers for a particular site)
+        site_id = request.query_params.get("site_id")
+        if not site_id:
+            # render template with empty data and site list
+            return templates.TemplateResponse("report.html", {"request": request, "user": user, "sites": sites, "selected_site": None, "referrers": []})
+
+        # validate ownership
+        if sites and site_id not in [s["site_id"] for s in sites]:
+            raise HTTPException(status_code=400, detail="Invalid site_id")
+
+        # fetch referrers grouped by referrer: total events and distinct visitors
+        sql = "SELECT referrer, COUNT(*) as ref_count, COUNT(DISTINCT visitor_id) as visitors FROM events WHERE site_id=%s GROUP BY referrer ORDER BY ref_count DESC"
+        cur.execute(sql, (site_id,))
+        ref_rows = cur.fetchall()
+        referrers = []
+        for r in ref_rows:
+            ref = r[0] or ''
+            label = ref if ref.strip() else 'Direct'
+            referrers.append({"referrer": label, "count": int(r[1]), "visitors": int(r[2])})
+
+        return templates.TemplateResponse("report.html", {"request": request, "user": user, "sites": sites, "selected_site": site_id, "referrers": referrers})
+    finally:
+        conn.close()
 #---------------- Event Collection ----------------
 @app.post("/collect")
 async def collect(request: Request):
