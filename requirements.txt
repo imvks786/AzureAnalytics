@@ -6,7 +6,7 @@ python-dotenv
 httpx
 pytest
 python-multipart
-pymssql
+pymysql
 jinja2
 authlib
 itsdangerous

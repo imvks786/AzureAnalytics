@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from datetime import datetime, timedelta
 import os
 import uuid
-import pymssql
+import pymysql
 import json
 from dotenv import load_dotenv
 from authlib.integrations.starlette_client import OAuth
@@ -47,13 +47,15 @@ oauth.register(
 
 # ---------------- DB CONNECTION ----------------
 def get_connection():
-    return pymssql.connect(
-        server=os.getenv("AZURE_SQL_SERVER"),   
-        user=os.getenv("AZURE_SQL_USER"),     
-        password=os.getenv("AZURE_SQL_PASSWORD"),
-        database=os.getenv("AZURE_SQL_DB"),
-        port=1433,
-        timeout=5
+    return pymysql.connect(
+        host=os.getenv("MYSQL_HOST"),
+        user=os.getenv("MYSQL_USER"),      # user@servername
+        password=os.getenv("MYSQL_PASSWORD"),
+        database=os.getenv("MYSQL_DB"),
+        port=3306,
+        connect_timeout=5,
+        autocommit=True,
+        ssl={"ssl": {}}   # 🔐 SSL ENABLED
     )
 
 # ---------------- INIT DB ----------------
@@ -61,73 +63,63 @@ def init_db():
     conn = get_connection()
     cur = conn.cursor()
     try:
+        # create users first so FK in sites can reference it
         cur.execute("""
-        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sites' and xtype='U')
-        CREATE TABLE sites (
-            id INT IDENTITY PRIMARY KEY,
-            site_id NVARCHAR(100) UNIQUE,
-            site_name NVARCHAR(200),
-            domain NVARCHAR(200),
-            PropertyName NVARCHAR(200),
-            created_at DATETIME2 DEFAULT SYSUTCDATETIME()
-        )
+        CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            email VARCHAR(200) UNIQUE,
+            name VARCHAR(200),
+            picture VARCHAR(500),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB
         """)
 
         cur.execute("""
-        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='visitors' and xtype='U')
-        CREATE TABLE visitors (
-            id BIGINT IDENTITY PRIMARY KEY,
-            visitor_id NVARCHAR(100),
-            site_id NVARCHAR(100),
-            first_seen DATETIME2 DEFAULT SYSUTCDATETIME(),
-            last_seen DATETIME2,
-            UNIQUE(visitor_id, site_id)
-        )
+        CREATE TABLE IF NOT EXISTS sites (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            site_id VARCHAR(100) UNIQUE,
+            site_name VARCHAR(200),
+            domain VARCHAR(200),
+            PropertyName VARCHAR(200),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            user_id INT,
+            INDEX (user_id),
+            CONSTRAINT FK_sites_users FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB
         """)
 
         cur.execute("""
-        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='events' and xtype='U')
-        CREATE TABLE events (
-            id BIGINT IDENTITY PRIMARY KEY,
-            site_id NVARCHAR(100),
-            visitor_id NVARCHAR(100),
-            event_type NVARCHAR(50),
-            page_url NVARCHAR(MAX),
-            referrer NVARCHAR(MAX),
-            user_agent NVARCHAR(MAX),
-            ip_address NVARCHAR(50),
-            language NVARCHAR(20),
-            platform NVARCHAR(50),
-            screen_size NVARCHAR(20),
-            timezone NVARCHAR(50),
-            created_at DATETIME2 DEFAULT SYSUTCDATETIME()
-        )
+        CREATE TABLE IF NOT EXISTS visitors (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            visitor_id VARCHAR(100),
+            site_id VARCHAR(100),
+            first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_visitor_site (visitor_id, site_id)
+        ) ENGINE=InnoDB
         """)
 
         cur.execute("""
-        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' and xtype='U')
-        CREATE TABLE users (
-            id INT IDENTITY PRIMARY KEY,
-            email NVARCHAR(200) UNIQUE,
-            name NVARCHAR(200),
-            picture NVARCHAR(500),
-            created_at DATETIME2 DEFAULT SYSUTCDATETIME()
-        )
-        """)
-        cur.execute("""
-        IF COL_LENGTH('sites', 'user_id') IS NULL
-            ALTER TABLE sites ADD user_id INT
-        """)
-        cur.execute("""
-        IF NOT EXISTS (
-            SELECT 1 FROM sys.foreign_keys fk
-            JOIN sys.tables t ON fk.parent_object_id = t.object_id
-            WHERE t.name = 'sites' AND fk.name = 'FK_sites_users'
-        )
-        BEGIN
-            IF COL_LENGTH('sites', 'user_id') IS NOT NULL AND OBJECT_ID('users') IS NOT NULL
-                ALTER TABLE sites ADD CONSTRAINT FK_sites_users FOREIGN KEY (user_id) REFERENCES users(id)
-        END
+        CREATE TABLE IF NOT EXISTS events (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            site_id VARCHAR(100),
+            visitor_id VARCHAR(100),
+            event_type VARCHAR(50),
+            page_url TEXT,
+            referrer TEXT,
+            user_agent TEXT,
+            ip_address VARCHAR(50),
+            language VARCHAR(20),
+            platform VARCHAR(50),
+            screen_size VARCHAR(20),
+            timezone VARCHAR(50),
+            clicked_url TEXT,
+            is_external TINYINT(1),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX (site_id),
+            INDEX (visitor_id),
+            INDEX (created_at)
+        ) ENGINE=InnoDB
         """)
 
         conn.commit()
@@ -263,12 +255,15 @@ def add_site(request: Request, site_name: str = Form(...), domain: str = Form(..
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     user = request.session.get("user")
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
 
     conn = get_connection()
     cur = conn.cursor()
 
     # Fetch all sites for this user
-    cur.execute("SELECT site_name, domain, site_id FROM sites WHERE user_id=%s", (user["user_id"],))
+    cur.execute("SELECT site_name, domain, site_id FROM sites WHERE user_id=%s", (user_id,))
     fetched = cur.fetchall()  # returns list of tuples
 
     # Convert to list of dicts for template
@@ -304,15 +299,38 @@ def report_referrers(request: Request):
         site_id = request.query_params.get("site_id")
         if not site_id:
             # render template with empty data and site list
-            return templates.TemplateResponse("report.html", {"request": request, "user": user, "sites": sites, "selected_site": None, "referrers": []})
+            return templates.TemplateResponse("report.html", {"request": request, "user": user, "sites": sites, "selected_site": None, "referrers": [], "bounce_rate": None})
 
         # validate ownership
         if sites and site_id not in [s["site_id"] for s in sites]:
             raise HTTPException(status_code=400, detail="Invalid site_id")
 
+        # optional date range filters: ?start=YYYY-MM-DD&end=YYYY-MM-DD
+        start_q = request.query_params.get("start")
+        end_q = request.query_params.get("end")
+
+        where_clauses = ["site_id=%s"]
+        params = [site_id]
+
+        try:
+            if start_q:
+                # treat start as inclusive beginning of day
+                start_dt = datetime.fromisoformat(start_q)
+                where_clauses.append("created_at >= %s")
+                params.append(start_dt)
+            if end_q:
+                # treat end as inclusive -> add one day and use < end_dt
+                end_dt = datetime.fromisoformat(end_q) + timedelta(days=1)
+                where_clauses.append("created_at < %s")
+                params.append(end_dt)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
+        where_sql = " AND ".join(where_clauses)
+
         # fetch referrers grouped by referrer: total events and distinct visitors
-        sql = "SELECT referrer, COUNT(*) as ref_count, COUNT(DISTINCT visitor_id) as visitors FROM events WHERE site_id=%s GROUP BY referrer ORDER BY ref_count DESC"
-        cur.execute(sql, (site_id,))
+        sql = f"SELECT referrer, COUNT(*) as ref_count, COUNT(DISTINCT visitor_id) as visitors FROM events WHERE {where_sql} GROUP BY referrer ORDER BY ref_count DESC"
+        cur.execute(sql, tuple(params))
         ref_rows = cur.fetchall()
         referrers = []
         for r in ref_rows:
@@ -320,7 +338,15 @@ def report_referrers(request: Request):
             label = ref if ref.strip() else 'Direct'
             referrers.append({"referrer": label, "count": int(r[1]), "visitors": int(r[2])})
 
-        return templates.TemplateResponse("report.html", {"request": request, "user": user, "sites": sites, "selected_site": site_id, "referrers": referrers})
+        # compute bounce rate for the same range: visitors with only 1 event
+        sql_vis = f"SELECT visitor_id, COUNT(*) as cnt FROM events WHERE {where_sql} GROUP BY visitor_id"
+        cur.execute(sql_vis, tuple(params))
+        visitor_counts = cur.fetchall()
+        total_visitors = len(visitor_counts)
+        bounce_visitors = sum(1 for v in visitor_counts if v[1] == 1)
+        bounce_rate = round((bounce_visitors / total_visitors) * 100, 1) if total_visitors else 0
+
+        return templates.TemplateResponse("report.html", {"request": request, "user": user, "sites": sites, "selected_site": site_id, "referrers": referrers, "bounce_rate": bounce_rate})
     finally:
         conn.close()
 #---------------- Event Collection ----------------
@@ -343,19 +369,15 @@ async def collect(request: Request):
         if not cur.fetchone():
             raise HTTPException(400, "Invalid site_id")
 
-        # visitor upsert
-        cur.execute("""
-        IF EXISTS (SELECT 1 FROM visitors WHERE visitor_id=%s AND site_id=%s)
-            UPDATE visitors SET last_seen=SYSUTCDATETIME()
-            WHERE visitor_id=%s AND site_id=%s
-        ELSE
-            INSERT INTO visitors (visitor_id, site_id)
-            VALUES (%s, %s)
-        """, (
-            visitor_id, site_id,
-            visitor_id, site_id,
-            visitor_id, site_id
-        ))
+        # visitor upsert - use MySQL ON DUPLICATE KEY UPDATE
+        cur.execute(
+            """
+            INSERT INTO visitors (visitor_id, site_id, last_seen)
+            VALUES (%s, %s, NOW())
+            ON DUPLICATE KEY UPDATE last_seen = NOW()
+            """,
+            (visitor_id, site_id)
+        )
 
         # insert event
         cur.execute("""
@@ -424,20 +446,24 @@ def realtime_metrics(request: Request):
 
         placeholders = ",".join(["%s"] * len(site_ids))
 
+        # compute time windows
+        threshold_5 = datetime.utcnow() - timedelta(minutes=5)
+        threshold_30 = datetime.utcnow() - timedelta(minutes=30)
+
         # active users right now (last 5 minutes)
-        sql = f"SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -5, SYSUTCDATETIME())"
-        cur.execute(sql, tuple(site_ids))
+        sql = f"SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id IN ({placeholders}) AND created_at >= %s"
+        cur.execute(sql, tuple(site_ids) + (threshold_5,))
         active_users = cur.fetchone()[0] or 0
 
         # page views last 30 minutes
-        sql = f"SELECT COUNT(*) FROM events WHERE site_id IN ({placeholders}) AND event_type=%s AND created_at >= DATEADD(minute, -30, SYSUTCDATETIME())"
-        params = tuple(site_ids) + ("page_view",)
+        sql = f"SELECT COUNT(*) FROM events WHERE site_id IN ({placeholders}) AND event_type=%s AND created_at >= %s"
+        params = tuple(site_ids) + ("page_view", threshold_30)
         cur.execute(sql, params)
         page_views = cur.fetchone()[0] or 0
 
         # average session duration in seconds (approx) over last 30 minutes
-        sql = f"SELECT visitor_id, MIN(created_at) as min_ts, MAX(created_at) as max_ts FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -30, SYSUTCDATETIME()) GROUP BY visitor_id"
-        cur.execute(sql, tuple(site_ids))
+        sql = f"SELECT visitor_id, MIN(created_at) as min_ts, MAX(created_at) as max_ts FROM events WHERE site_id IN ({placeholders}) AND created_at >= %s GROUP BY visitor_id"
+        cur.execute(sql, tuple(site_ids) + (threshold_30,))
         sessions = cur.fetchall()
         durations = []
         for v in sessions:
@@ -468,8 +494,8 @@ def realtime_metrics(request: Request):
             values.append(val)
 
         # traffic sources (simple classification based on referrer, last 30 minutes)
-        sql = f"SELECT referrer, COUNT(*) as cnt FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -30, SYSUTCDATETIME()) GROUP BY referrer"
-        cur.execute(sql, tuple(site_ids))
+        sql = f"SELECT referrer, COUNT(*) as cnt FROM events WHERE site_id IN ({placeholders}) AND created_at >= %s GROUP BY referrer"
+        cur.execute(sql, tuple(site_ids) + (threshold_30,))
         ref_rows = cur.fetchall()
         sources = {"Direct": 0, "Organic": 0, "Social": 0, "Referral": 0, "Email": 0}
         for r in ref_rows:
@@ -488,8 +514,8 @@ def realtime_metrics(request: Request):
                 sources["Referral"] += cnt
 
         # top pages (last 30 minutes)
-        sql = f"SELECT page_url, COUNT(*) as views, COUNT(DISTINCT visitor_id) as users FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -30, SYSUTCDATETIME()) GROUP BY page_url ORDER BY views DESC"
-        cur.execute(sql, tuple(site_ids))
+        sql = f"SELECT page_url, COUNT(*) as views, COUNT(DISTINCT visitor_id) as users FROM events WHERE site_id IN ({placeholders}) AND created_at >= %s GROUP BY page_url ORDER BY views DESC"
+        cur.execute(sql, tuple(site_ids) + (threshold_30,))
         pages = cur.fetchall()
         top_pages = []
         for p in pages[:10]:
@@ -541,8 +567,9 @@ def event_counts(request: Request):
             site_ids = [site_param]
 
         placeholders = ",".join(["%s"] * len(site_ids))
-        sql = f"SELECT event_type, COUNT(*) as cnt FROM events WHERE site_id IN ({placeholders}) AND created_at >= DATEADD(minute, -%s, SYSUTCDATETIME()) GROUP BY event_type ORDER BY cnt DESC"
-        params = tuple(site_ids) + (minutes,)
+        threshold_dt = datetime.utcnow() - timedelta(minutes=minutes)
+        sql = f"SELECT event_type, COUNT(*) as cnt FROM events WHERE site_id IN ({placeholders}) AND created_at >= %s GROUP BY event_type ORDER BY cnt DESC"
+        params = tuple(site_ids) + (threshold_dt,)
         cur.execute(sql, params)
         rows = cur.fetchall()
 

@@ -31,7 +31,7 @@
             </nav>
         </aside>
 
-        <main class="main-content">
+        <main class="main-content" style="overflow: scroll;">
             <div class="header">
                 <h1>Referrers Report</h1>
                 <p class="subtitle">View referrer breakdown for a selected site</p>
@@ -46,8 +46,20 @@
                         <option value="{{ s.site_id }}" {% if selected_site == s.site_id %}selected{% endif %}>{{ s.site_name }} ({{ s.domain }})</option>
                         {% endfor %}
                     </select>
+                    <label for="startDate" style="margin-left:12px; font-weight:600;">Start:</label>
+                    <input type="date" id="startDate" name="start" value="{{ request.query_params.get('start','') }}" style="margin-left:8px; padding:6px 8px; border-radius:6px; border:1px solid #e8eaed;">
+                    <label for="endDate" style="margin-left:12px; font-weight:600;">End:</label>
+                    <input type="date" id="endDate" name="end" value="{{ request.query_params.get('end','') }}" style="margin-left:8px; padding:6px 8px; border-radius:6px; border:1px solid #e8eaed;">
                     <button type="submit" style="margin-left:12px; padding:8px 12px; border-radius:6px; background:#1a73e8; color:white; border:none;">Show</button>
                 </form>
+            </div>
+
+            <div style="display:flex; gap:12px; margin-bottom:16px;">
+                <div class="chart-card" style="flex:0 0 220px; padding:12px;">
+                    <h4 style="margin:0 0 8px 0;">Bounce Rate</h4>
+                    <div style="font-size:20px; font-weight:700; color:#202124;">{% if bounce_rate is not none %}{{ bounce_rate }}%{% else %}-{% endif %}</div>
+                    <div style="color:#5f6368; font-size:12px; margin-top:6px;">Based on selected date range</div>
+                </div>
             </div>
 
             <div class="table-container">
