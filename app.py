@@ -14,7 +14,6 @@ from authlib.integrations.starlette_client import OAuth
 from starlette.middleware.sessions import SessionMiddleware
 
 load_dotenv()
-
 templates = Jinja2Templates(directory="templates")
 
 app = FastAPI(title="Analytics API")
@@ -622,5 +621,6 @@ def track_js():
             "Expires": "0"
         }
     )
+
 
 #---------------- Run the app ----------------
