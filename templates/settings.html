@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Analytics</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="/static/dashboard.css" type="text/css">
+    <link rel="stylesheet" href="/static/css/navbar.css" type="text/css">
+    <link rel="stylesheet" href="/static/css/sidebar.css" type="text/css">
+    <style>
+        .settings-container {
+            padding: 24px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .site-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .site-card-header {
+            border-bottom: 1px solid #f1f3f4;
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+        }
+        .site-card-header h2 {
+            margin: 0;
+            font-size: 20px;
+            color: #202124;
+        }
+        .site-card-header .domain {
+            font-size: 13px;
+            color: #5f6368;
+            margin-top: 4px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #5f6368;
+            font-size: 14px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .btn-primary:hover {
+            background: #1557b0;
+        }
+        .access-section {
+            margin-top: 24px;
+            border-top: 1px dashed #dadce0;
+            padding-top: 24px;
+        }
+        .access-list {
+            list-style: none;
+            padding: 0;
+            margin: 16px 0;
+        }
+        .access-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f3f4;
+        }
+        .access-item:last-child {
+            border-bottom: none;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: #e8f0fe;
+            color: #1a73e8;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .btn-icon {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #5f6368;
+            padding: 4px;
+        }
+        .btn-icon:hover {
+            color: #d93025;
+        }
+        .add-user-form {
+            display: flex;
+            gap: 12px;
+        }
+        .add-user-form input {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    {% include "navbar.html" %}
+
+    <div class="app-body">
+        {% include "sidebar.html" %}
+
+        <main class="main-content">
+            <div class="settings-container">
+                <h1 style="margin-bottom: 24px;">Settings</h1>
+
+                {% for site in sites %}
+                <div class="site-card">
+                    <div class="site-card-header">
+                        <h2>{{ site.site_name }}</h2>
+                        <div class="domain">{{ site.domain }} (ID: {{ site.site_id }})</div>
+                    </div>
+
+                    <form action="/settings/update" method="post">
+                        <input type="hidden" name="site_id" value="{{ site.site_id }}">
+                        <div class="form-group">
+                            <label>Site Name</label>
+                            <input type="text" name="site_name" value="{{ site.site_name }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Property Name</label>
+                            <input type="text" name="property_name" value="{{ site.PropertyName }}" required>
+                        </div>
+                        <button type="submit" class="btn-primary">Save Changes</button>
+                    </form>
+
+                    <div class="access-section">
+                        <h3>Access Management</h3>
+                        <p style="color: #5f6368; font-size: 13px; margin-bottom: 16px;">
+                            Grant access to other Google users. They will be able to view reports for this site.
+                        </p>
+
+                        <ul class="access-list">
+                            {% for admin in site.admins %}
+                            <li class="access-item">
+                                <div class="user-info">
+                                    <div class="user-avatar">{{ admin.name[0] | upper }}</div>
+                                    <div>
+                                        <div style="font-weight: 500;">{{ admin.name }}</div>
+                                        <div style="font-size: 12px; color: #5f6368;">{{ admin.email }}</div>
+                                    </div>
+                                </div>
+                                <form action="/settings/access/remove" method="post" onsubmit="return confirm('Remove access for {{ admin.email }}?');">
+                                    <input type="hidden" name="site_id" value="{{ site.site_id }}">
+                                    <input type="hidden" name="user_id" value="{{ admin.user_id }}">
+                                    <button type="submit" class="btn-icon" title="Remove Access">
+                                        <span class="material-icons">delete</span>
+                                    </button>
+                                </form>
+                            </li>
+                            {% endfor %}
+                        </ul>
+
+                        <form action="/settings/access/add" method="post" class="add-user-form">
+                            <input type="hidden" name="site_id" value="{{ site.site_id }}">
+                            <input type="email" name="email" placeholder="Enter Google email address" required>
+                            <button type="submit" class="btn-primary" style="background: #fff; border: 1px solid #dadce0; color: #1a73e8;">Add Admin</button>
+                        </form>
+                    </div>
+                </div>
+                {% else %}
+                <div class="site-card">
+                    <p>You don't own any sites yet.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/sidebar.js"></script>
+</body>
+</html>

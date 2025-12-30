@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tech Details - Analytics</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="/static/dashboard.css" type="text/css">
+    <link rel="stylesheet" href="/static/css/navbar.css" type="text/css">
+    <link rel="stylesheet" href="/static/css/sidebar.css" type="text/css">
+    <style>
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 24px;
+            padding: 24px;
+        }
+        .tech-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        .tech-card h3 {
+            margin-top: 0;
+            color: #202124;
+            font-size: 16px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chart-container {
+            position: relative;
+            height: 250px;
+            margin-bottom: 20px;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .data-table th, .data-table td {
+            text-align: left;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f1f3f4;
+        }
+        .data-table th {
+            color: #5f6368;
+            font-weight: 500;
+        }
+        .data-table td:last-child {
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    {% include "navbar.html" %}
+
+    <div class="app-body">
+        {% include "sidebar.html" %}
+
+        <main class="main-content">
+            <div class="report-header">
+                <div>
+                    <h1>Tech Details</h1>
+                    <div class="subtitle">Browser, OS, and Device Analytics</div>
+                </div>
+                
+                <!-- Filter Controls (similar to report.html) -->
+                <div class="report-controls">
+                    <form method="get" class="filter-form">
+                        <input type="hidden" name="site_id" value="{{ selected_site }}">
+                        <input type="date" name="start" value="{{ request.query_params.start }}" aria-label="Start Date">
+                        <span class="sep">-</span>
+                        <input type="date" name="end" value="{{ request.query_params.end }}" aria-label="End Date">
+                        <button type="submit" class="btn-filter">Apply</button>
+                    </form>
+                </div>
+            </div>
+
+            {% if not sites %}
+            <div class="empty-state">
+                <p>No sites found. Please create a site first.</p>
+            </div>
+            {% else %}
+            
+            <div class="tech-grid">
+                <!-- Browser Section -->
+                <div class="tech-card">
+                    <h3>Browser</h3>
+                    <div class="chart-container">
+                        <canvas id="browserChart"></canvas>
+                    </div>
+                    <table class="data-table">
+                        <thead><tr><th>Browser</th><th>Users</th></tr></thead>
+                        <tbody>
+                            {% for item in data.browsers[:5] %}
+                            <tr>
+                                <td>{{ item.label }}</td>
+                                <td>{{ item.count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- OS Section -->
+                <div class="tech-card">
+                    <h3>Operating System</h3>
+                    <div class="chart-container">
+                        <canvas id="osChart"></canvas>
+                    </div>
+                    <table class="data-table">
+                        <thead><tr><th>OS</th><th>Users</th></tr></thead>
+                        <tbody>
+                             {% for item in data.os[:5] %}
+                            <tr>
+                                <td>{{ item.label }}</td>
+                                <td>{{ item.count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Device Section -->
+                <div class="tech-card">
+                    <h3>Device Category</h3>
+                    <div class="chart-container">
+                        <canvas id="deviceChart"></canvas>
+                    </div>
+                    <table class="data-table">
+                        <thead><tr><th>Category</th><th>Users</th></tr></thead>
+                        <tbody>
+                             {% for item in data.devices %}
+                            <tr>
+                                <td>{{ item.label or 'Unknown' }}</td>
+                                <td>{{ item.count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Resolution Section -->
+                <div class="tech-card">
+                    <h3>Screen Resolution</h3>
+                    <div class="chart-container" style="display:none;">
+                        <!-- Less useful as chart, just table usually -->
+                    </div>
+                    <table class="data-table">
+                        <thead><tr><th>Resolution</th><th>Users</th></tr></thead>
+                        <tbody>
+                             {% for item in data.screens[:10] %}
+                            <tr>
+                                <td>{{ item.label }}</td>
+                                <td>{{ item.count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/sidebar.js"></script>
+    <script>
+        const colors = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#8AB4F8', '#F28B82', '#FDD663', '#81C995'];
+
+        function initChart(id, type, labels, data, labelName) {
+            const ctx = document.getElementById(id);
+            if(!ctx) return;
+            new Chart(ctx, {
+                type: type,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: labelName,
+                        data: data,
+                        backgroundColor: colors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { boxWidth: 12 } }
+                    }
+                }
+            });
+        }
+
+        const browsers = {{ data.browsers | tojson }};
+        if(browsers.length) {
+            initChart('browserChart', 'doughnut', browsers.map(d=>d.label), browsers.map(d=>d.count), 'Browsers');
+        }
+
+        const os = {{ data.os | tojson }};
+        if(os.length) {
+            initChart('osChart', 'doughnut', os.map(d=>d.label), os.map(d=>d.count), 'OS');
+        }
+
+        const devices = {{ data.devices | tojson }};
+        if(devices.length) {
+            initChart('deviceChart', 'pie', devices.map(d=>d.label||'Unknown'), devices.map(d=>d.count), 'Devices');
+        }
+    </script>
+</body>
+</html>

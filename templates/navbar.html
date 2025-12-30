@@ -26,9 +26,18 @@
             </div>
         </div>
 
-        <div class="user-profile">
-            <img src="{{ user.picture }}" alt="Profile Picture" class="user-avatar" />
-            <span class="user-name" data-id="{{ user.user_id }}">{{ user.name }}</span>
+        <div class="profile" id="userProfile" aria-haspopup="true" aria-expanded="false">
+            <img src="{{ user.picture }}" alt="Profile Picture" class="profile-img" />
+            
+            <div class="profile-dropdown">
+                <div class="profile-info">
+                    <div class="profile-name">{{ user.name }}</div>
+                    <div class="profile-email">{{ user.email }}</div>
+                </div>
+                <div class="profile-actions">
+                    <a href="/logout" class="logout-btn">Logout</a>
+                </div>
+            </div>
         </div>
     </div> 
 </nav>

@@ -333,6 +333,13 @@
                     <h2>Get Started</h2>
                     <p class="subtitle">Sign in to access your analytics dashboard</p>
                     
+                    {% if user %}
+                    <a href="/dashboard" style="text-decoration: none;">
+                        <button class="google-btn" style="background: #2563eb; color: white; border: none;">
+                            Go to Dashboard
+                        </button>
+                    </a>
+                    {% else %}
                     <a href="/login/google" style="text-decoration: none;">
                         <button class="google-btn">
                             <svg class="google-icon" viewBox="0 0 24 24">
@@ -344,6 +351,7 @@
                             Sign in with Google
                         </button>
                     </a>
+                    {% endif %}
 
                     <!-- <div class="divider">or</div> -->
 

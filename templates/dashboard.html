@@ -5,23 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Real-Time Analytics Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="stylesheet" href="/static/dashboard.css" type="text/css">
+    <link rel="stylesheet" href="/static/css/navbar.css" type="text/css">
+    <link rel="stylesheet" href="/static/css/sidebar.css" type="text/css">
 </head>
 <body>
     {% include "navbar.html" %}
 
     <div class="app-body">
-        <aside class="sidebar" id="sidebar" aria-hidden="false">
-            <nav class="sidebar-nav">
-                <a class="nav-item active" href="#">Overview</a>
-                <a class="nav-item" href="/dashboard">Realtime</a>
-                <a class="nav-item" href="/reports/referrers">Referrer</a>
-                <div class="nav-divider"></div>
-                <a class="nav-item" href="#">Audience</a>
-                <div class="nav-divider"></div>
-                <a class="nav-item" href="#">Settings</a>
-            </nav>
-        </aside>
+        {% include "sidebar.html" %}
 
     <main class="main-content">
         <div class="header">
@@ -70,9 +63,9 @@
         </div>
     </div>
 
-    <div style="display: flex; gap: 20px;">
-        <div class="table-container" style="width: 70%;">
-            <h3 style="margin-bottom: 16px;">Top Active Pages</h3>
+    <div class="bottom-section">
+        <div class="table-container">
+            <h3>Top Active Pages</h3>
             <table id="pagesTable">
                 <thead>
                     <tr>
@@ -84,13 +77,15 @@
                 <tbody></tbody>
             </table>
         </div>
-        <div class="chart-card events-card" style="width: 30%;">
-            <h3 style="margin-bottom: 16px;"><b>Event count by name (last 30 min)</b></h3>
+        <div class="chart-card events-card">
+            <h3><b>Event count by name (last 30 min)</b></h3>
             <div id="eventsList" style="margin-top: 12px;"></div>
         </div>
     </div>
 
     <script src="/static/dashboard.js"></script>
+    <script src="/static/js/navbar.js"></script>
+    <script src="/static/js/sidebar.js"></script>
     </main>
     </div>
 

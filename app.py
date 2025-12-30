@@ -121,11 +121,63 @@ def init_db():
         ) ENGINE=InnoDB
         """)
 
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS TechStack (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            site_id VARCHAR(100),
+            Browser VARCHAR(100),
+            BrowserVersion VARCHAR(50),
+            DeviceCat VARCHAR(50),
+            ScreenRes VARCHAR(50),
+            Platform VARCHAR(50),
+            OS VARCHAR(50),
+            OSVersion VARCHAR(50),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX (site_id)
+        ) ENGINE=InnoDB
+        """)
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS site_access (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            site_id VARCHAR(100),
+            user_id INT,
+            role VARCHAR(50) DEFAULT 'admin',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_access (site_id, user_id),
+            CONSTRAINT FK_access_site FOREIGN KEY (site_id) REFERENCES sites(site_id) ON DELETE CASCADE,
+            CONSTRAINT FK_access_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB
+        """)
+
         conn.commit()
     finally:
         conn.close()
 
 init_db()
+
+# ---------------- HELPERS ----------------
+def get_user_sites_sql():
+    # Helper SQL clause to find sites user owns OR has access to
+    # returns clause and params must be handled by caller
+    pass
+
+def get_authorized_site_ids(user_id):
+    """Returns a list of site_ids that the user owns or has access to."""
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Sites owned
+        cur.execute("SELECT site_id FROM sites WHERE user_id=%s", (user_id,))
+        owned = [r[0] for r in cur.fetchall()]
+        
+        # Sites shared
+        cur.execute("SELECT site_id FROM site_access WHERE user_id=%s", (user_id,))
+        shared = [r[0] for r in cur.fetchall()]
+        
+        return list(set(owned + shared))
+    finally:
+        conn.close()
 
 def get_current_user(request: Request):
     user = request.session.get("user")
@@ -154,8 +206,9 @@ def health():
 # ---------------- INDEX UI ----------------
 @app.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
+    user = request.session.get("user")
     # Render index.html
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("index.html", {"request": request, "user": user})
 
 #---------------- OAUTH ROUTES ----------------
 @app.get("/login/google")
@@ -214,7 +267,22 @@ async def auth_google(request: Request):
 @app.get("/CreateSite", response_class=HTMLResponse)
 async def read_index(request: Request):
     # Check session
-    user = request.session.get("user")  
+    user = request.session.get("user")
+    if not user:
+         return RedirectResponse(url="/")
+
+    # Check if user already has sites
+    user_id = request.session.get("user_id")
+    if user_id:
+        conn = get_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT 1 FROM sites WHERE user_id=%s LIMIT 1", (user_id,))
+            if cur.fetchone():
+                return RedirectResponse(url="/dashboard")
+        finally:
+            conn.close()
+
     # user saved in session after Google login
     return templates.TemplateResponse(
         "create_site.html",
@@ -262,8 +330,19 @@ def dashboard(request: Request):
     cur = conn.cursor()
 
     # Fetch all sites for this user
-    cur.execute("SELECT site_name, domain, site_id FROM sites WHERE user_id=%s", (user_id,))
-    fetched = cur.fetchall()  # returns list of tuples
+    # Fetch sites user owns OR has access to
+    # We can do a UNION or join.
+    sql = """
+    SELECT s.site_name, s.domain, s.site_id, s.user_id, 'owner' as role 
+    FROM sites s WHERE s.user_id=%s
+    UNION
+    SELECT s.site_name, s.domain, s.site_id, sa.site_id as owner_id, 'shared' as role
+    FROM sites s 
+    JOIN site_access sa ON s.site_id = sa.site_id 
+    WHERE sa.user_id=%s
+    """
+    cur.execute(sql, (user_id, user_id))
+    fetched = cur.fetchall()
 
     # Convert to list of dicts for template
     data = [{"site_name": row[0], "domain": row[1], "site_id": row[2]} for row in fetched] if fetched else []
@@ -290,7 +369,17 @@ def report_referrers(request: Request):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT site_name, domain, site_id FROM sites WHERE user_id=%s", (user_id,))
+        # REFACTOR: Fetch owned + shared sites
+        sql_sites = """
+        SELECT s.site_name, s.domain, s.site_id 
+        FROM sites s WHERE s.user_id=%s
+        UNION
+        SELECT s.site_name, s.domain, s.site_id
+        FROM sites s 
+        JOIN site_access sa ON s.site_id = sa.site_id 
+        WHERE sa.user_id=%s
+        """
+        cur.execute(sql_sites, (user_id, user_id))
         rows = cur.fetchall()
         sites = [{"site_name": r[0], "domain": r[1], "site_id": r[2]} for r in rows] if rows else []
 
@@ -346,6 +435,79 @@ def report_referrers(request: Request):
         bounce_rate = round((bounce_visitors / total_visitors) * 100, 1) if total_visitors else 0
 
         return templates.TemplateResponse("report.html", {"request": request, "user": user, "sites": sites, "selected_site": site_id, "referrers": referrers, "bounce_rate": bounce_rate})
+    finally:
+        conn.close()
+
+@app.get("/reports/tech", response_class=HTMLResponse)
+def report_tech(request: Request):
+    user = request.session.get("user")
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Fetch sites owned + shared
+        cur.execute("SELECT site_id FROM sites WHERE user_id=%s UNION SELECT site_id FROM site_access WHERE user_id=%s", (user_id, user_id))
+        rows = cur.fetchall()
+        authorized_site_ids = [r[0] for r in rows]
+
+        # Site Selection
+        cur.execute("SELECT site_name, domain, site_id FROM sites WHERE user_id=%s UNION SELECT s.site_name, s.domain, s.site_id FROM sites s JOIN site_access sa ON s.site_id=sa.site_id WHERE sa.user_id=%s", (user_id, user_id))
+        all_sites_rows = cur.fetchall()
+        sites = [{"site_name": r[0], "domain": r[1], "site_id": r[2]} for r in all_sites_rows]
+
+        site_id = request.query_params.get("site_id")
+        if not site_id:
+             # Default to first site if available, or just render empty
+             if sites:
+                 site_id = sites[0]["site_id"]
+             else:
+                 return templates.TemplateResponse("tech_details.html", {"request": request, "user": user, "sites": [], "selected_site": None})
+
+        if site_id not in authorized_site_ids:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        # Filters
+        start_q = request.query_params.get("start")
+        end_q = request.query_params.get("end")
+        
+        where_clauses = ["site_id=%s"]
+        params = [site_id]
+
+        if start_q:
+            start_dt = datetime.fromisoformat(start_q)
+            where_clauses.append("created_at >= %s")
+            params.append(start_dt)
+        if end_q:
+            end_dt = datetime.fromisoformat(end_q) + timedelta(days=1)
+            where_clauses.append("created_at < %s")
+            params.append(end_dt)
+        
+        where_sql = " AND ".join(where_clauses)
+        
+        # Aggregations
+        data = {}
+        
+        # Browser
+        cur.execute(f"SELECT Browser, COUNT(*) as cnt FROM TechStack WHERE {where_sql} GROUP BY Browser ORDER BY cnt DESC", tuple(params))
+        data["browsers"] = [{"label": r[0], "count": r[1]} for r in cur.fetchall()]
+
+        # OS
+        cur.execute(f"SELECT OS, COUNT(*) as cnt FROM TechStack WHERE {where_sql} GROUP BY OS ORDER BY cnt DESC", tuple(params))
+        data["os"] = [{"label": r[0], "count": r[1]} for r in cur.fetchall()]
+
+        # Device Category
+        cur.execute(f"SELECT DeviceCat, COUNT(*) as cnt FROM TechStack WHERE {where_sql} GROUP BY DeviceCat ORDER BY cnt DESC", tuple(params))
+        data["devices"] = [{"label": r[0], "count": r[1]} for r in cur.fetchall()]
+
+        # Screen Resolution
+        cur.execute(f"SELECT ScreenRes, COUNT(*) as cnt FROM TechStack WHERE {where_sql} GROUP BY ScreenRes ORDER BY cnt DESC", tuple(params))
+        data["screens"] = [{"label": r[0], "count": r[1]} for r in cur.fetchall()]
+
+        return templates.TemplateResponse("tech_details.html", {"request": request, "user": user, "sites": sites, "selected_site": site_id, "data": data})
+
     finally:
         conn.close()
 #---------------- Event Collection ----------------
@@ -420,8 +582,8 @@ def realtime_metrics(request: Request):
     cur = conn.cursor()
 
     try:
-        # get site ids owned by this user
-        cur.execute("SELECT site_id FROM sites WHERE user_id=%s", (user_id,))
+        # get authorized site ids
+        cur.execute("SELECT site_id FROM sites WHERE user_id=%s UNION SELECT site_id FROM site_access WHERE user_id=%s", (user_id, user_id))
         rows = cur.fetchall()
         site_ids = [r[0] for r in rows]
 
@@ -552,7 +714,7 @@ def event_counts(request: Request):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT site_id FROM sites WHERE user_id=%s", (user_id,))
+        cur.execute("SELECT site_id FROM sites WHERE user_id=%s UNION SELECT site_id FROM site_access WHERE user_id=%s", (user_id, user_id))
         rows = cur.fetchall()
         site_ids = [r[0] for r in rows]
         if not site_ids:
@@ -592,7 +754,7 @@ def event_counts(request: Request):
 @app.get("/logout")
 def logout(request: Request):
     request.session.clear()
-    return {"message": "Logged out"}
+    return RedirectResponse(url="/")
 
 #---------------- Session debug ----------------
 @app.get("/session")
@@ -624,3 +786,133 @@ def track_js():
 
 
 #---------------- Run the app ----------------
+
+# ---------------- Settings UI ----------------
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request):
+    user = request.session.get("user")
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Fetch sites owned by user (they can rename these)
+        cur.execute("SELECT site_name, domain, site_id, PropertyName FROM sites WHERE user_id=%s", (user_id,))
+        owned_rows = cur.fetchall()
+        owned_sites = [{"site_name": r[0], "domain": r[1], "site_id": r[2], "PropertyName": r[3]} for r in owned_rows]
+
+        # Fetch authorized users for each owned site
+        for site in owned_sites:
+             cur.execute("""
+                SELECT u.email, u.name, sa.role, u.id 
+                FROM site_access sa 
+                JOIN users u ON sa.user_id = u.id 
+                WHERE sa.site_id=%s
+             """, (site["site_id"],))
+             site["admins"] = [{"email": r[0], "name": r[1], "role": r[2], "user_id": r[3]} for r in cur.fetchall()]
+
+        return templates.TemplateResponse("settings.html", {"request": request, "user": user, "sites": owned_sites})
+    finally:
+        conn.close()
+
+@app.post("/settings/update")
+async def update_site_settings(request: Request):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    form = await request.form()
+    site_id = form.get("site_id")
+    site_name = form.get("site_name")
+    property_name = form.get("property_name")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Verify ownership
+        cur.execute("SELECT 1 FROM sites WHERE site_id=%s AND user_id=%s", (site_id, user_id))
+        if not cur.fetchone():
+            raise HTTPException(status_code=403, detail="Not authorized to edit this site")
+        
+        cur.execute("UPDATE sites SET site_name=%s, PropertyName=%s WHERE site_id=%s", (site_name, property_name, site_id))
+        conn.commit()
+    finally:
+        conn.close()
+    
+    return RedirectResponse(url="/settings", status_code=303)
+
+@app.post("/settings/access/add")
+async def add_site_access(request: Request):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    form = await request.form()
+    site_id = form.get("site_id")
+    email = form.get("email")
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Email required")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Verify ownership
+        cur.execute("SELECT 1 FROM sites WHERE site_id=%s AND user_id=%s", (site_id, user_id))
+        if not cur.fetchone():
+             raise HTTPException(status_code=403, detail="Not authorized")
+
+        # Find or create user
+        cur.execute("SELECT id FROM users WHERE email=%s", (email,))
+        row = cur.fetchone()
+        if row:
+            target_user_id = row[0]
+        else:
+            # Create shadow user
+            cur.execute("INSERT INTO users (email, name, picture) VALUES (%s, %s, %s)", (email, email.split('@')[0], None))
+            conn.commit()
+            cur.execute("SELECT id FROM users WHERE email=%s", (email,))
+            target_user_id = cur.fetchone()[0]
+
+        # Prevent adding self
+        if target_user_id == user_id:
+             return RedirectResponse(url="/settings", status_code=303)
+
+        # Add access
+        try:
+            cur.execute("INSERT INTO site_access (site_id, user_id) VALUES (%s, %s)", (site_id, target_user_id))
+            conn.commit()
+        except pymysql.err.IntegrityError:
+            pass # Already exists
+
+    finally:
+        conn.close()
+
+    return RedirectResponse(url="/settings", status_code=303)
+
+@app.post("/settings/access/remove")
+async def remove_site_access(request: Request):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    form = await request.form()
+    site_id = form.get("site_id")
+    target_user_id = form.get("user_id")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Verify ownership
+        cur.execute("SELECT 1 FROM sites WHERE site_id=%s AND user_id=%s", (site_id, user_id))
+        if not cur.fetchone():
+             raise HTTPException(status_code=403, detail="Not authorized")
+        
+        cur.execute("DELETE FROM site_access WHERE site_id=%s AND user_id=%s", (site_id, target_user_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+    return RedirectResponse(url="/settings", status_code=303)

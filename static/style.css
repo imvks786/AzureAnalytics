@@ -23,6 +23,12 @@ body {
     z-index: 100;
 }
 
+@media (max-width: 768px) {
+    .navbar {
+        padding: 0 15px;
+    }
+}
+
 .navbar-left {
     display: flex;
     align-items: center;
@@ -81,6 +87,12 @@ body {
     font-size: 14px;
     color: #202124;
     font-weight: 500;
+}
+
+@media (max-width: 640px) {
+    .user-name {
+        display: none;
+    }
 }
 
 
@@ -145,6 +157,22 @@ body {
     height: 2px;
     background-color: #d1d5db;
     margin: 0 1rem;
+}
+
+@media (max-width: 640px) {
+    .progress-steps {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 20px;
+    }
+
+    .progress-line {
+        display: none;
+    }
+
+    .step {
+        width: 100%;
+    }
 }
 
 .main-content {
@@ -239,6 +267,13 @@ body {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1.5rem;
+}
+
+@media (max-width: 640px) {
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
 }
 
 .form-select {
@@ -623,6 +658,18 @@ body {
     display: flex;
     justify-content: space-between;
     margin-top: 2rem;
+}
+
+@media (max-width: 640px) {
+    .button-group {
+        flex-direction: column-reverse;
+        gap: 1rem;
+    }
+    
+    .button-group .btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 .btn {
