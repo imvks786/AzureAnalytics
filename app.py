@@ -152,7 +152,17 @@ def init_db():
         ) ENGINE=InnoDB
         """)
 
+        # Watermark table: tracks last processed watermark per table
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS watermark (
+            tbl_name VARCHAR(200) PRIMARY KEY,
+            last_watermark DATETIME
+        ) ENGINE=InnoDB
+        """)
+
+
         # cur.execute("""ALTER TABLE techstack ADD COLUMN visitor_id VARCHAR(100)""")
+        # cur.execute("ALTER TABLE events ADD COLUMN page_title VARCHAR(255)")
 
 
         conn.commit()
@@ -196,6 +206,7 @@ class CollectEvent(BaseModel):
     siteId: str
     visitorId: str
     pageUrl: str
+    pageTitle: str
     referrer: str | None = None
     userAgent: str
     language: str | None = None
@@ -552,8 +563,8 @@ async def collect(request: Request):
             site_id, visitor_id, event_type,
             page_url, referrer, user_agent, ip_address,
             language, platform, screen_size, timezone,
-            clicked_url, is_external
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            clicked_url, is_external, page_title
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, %s)
         """, (
             site_id,
             visitor_id,
@@ -566,8 +577,9 @@ async def collect(request: Request):
             data.get("platform"),
             data.get("screenSize"),
             data.get("timezone"),
-            data.get("clicked_url"),      # <-- must exist
-            data.get("is_external")       # <-- must exist
+            data.get("clicked_url"),
+            data.get("is_external"),
+            data.get("pageTitle")
         ))
         conn.commit()
 

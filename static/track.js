@@ -53,6 +53,7 @@
         sessionId,
         eventType: type,
         pageUrl: location.href,
+        pageTitle: window.document.title,
         referrer: document.referrer,
         userAgent: navigator.userAgent,
         language: navigator.language,
