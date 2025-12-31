@@ -125,6 +125,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS TechStack (
             id INT AUTO_INCREMENT PRIMARY KEY,
             site_id VARCHAR(100),
+            visitor_id VARCHAR(100),
             Browser VARCHAR(100),
             BrowserVersion VARCHAR(50),
             DeviceCat VARCHAR(50),
@@ -134,6 +135,7 @@ def init_db():
             OSVersion VARCHAR(50),
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             INDEX (site_id)
+            ,INDEX (visitor_id)
         ) ENGINE=InnoDB
         """)
 
@@ -150,9 +152,13 @@ def init_db():
         ) ENGINE=InnoDB
         """)
 
+        # cur.execute("""ALTER TABLE techstack ADD COLUMN visitor_id VARCHAR(100)""")
+
+
         conn.commit()
     finally:
         conn.close()
+        print('DB Init Completed!')
 
 init_db()
 
