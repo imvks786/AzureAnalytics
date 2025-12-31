@@ -805,6 +805,29 @@ def track_js():
 
 #---------------- Run the app ----------------
 
+
+@app.post("/run/update_events_watermark")
+def run_update_events_watermark(request: Request):
+    """Execute the stored procedure `update_events_watermark`.
+    Only accepts POST requests.
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.callproc("update_events_watermark")
+        # consume any resultsets the procedure may produce
+        try:
+            cur.fetchall()
+        except Exception:
+            pass
+        conn.commit()
+        return {"status": "ok"}
+    except Exception as e:
+        print("Error executing stored procedure update_events_watermark:", e)
+        raise HTTPException(status_code=500, detail="Failed to execute stored procedure")
+    finally:
+        conn.close()
+
 # ---------------- Settings UI ----------------
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
