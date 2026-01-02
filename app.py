@@ -201,6 +201,18 @@ def get_current_user(request: Request):
         raise HTTPException(status_code=401, detail="Not authenticated")
     return user
 
+def get_client_ip(request: Request):
+    """
+    Get the client IP address, handling X-Forwarded-For header
+    if the app is behind a proxy (like Azure App Service).
+    """
+    x_forwarded_for = request.headers.get("X-Forwarded-For")
+    if x_forwarded_for:
+        # The first IP in the list is the original client
+        return x_forwarded_for.split(",")[0].strip()
+    # Fallback to direct connection IP
+    return request.client.host
+
 # ---------------- MODELS ----------------
 class CollectEvent(BaseModel):
     siteId: str
@@ -572,7 +584,7 @@ async def collect(request: Request):
             data.get("pageUrl"),
             data.get("referrer"),
             data.get("userAgent"),
-            request.client.host,
+            get_client_ip(request),
             data.get("language"),
             data.get("platform"),
             data.get("screenSize"),
