@@ -98,6 +98,9 @@ function updateMetricsFromApi(data) {
     const activeUsersEl = document.getElementById('activeUsers');
     if (activeUsersEl) activeUsersEl.textContent = data.activeUsers || 0;
 
+    const activeUsers30El = document.getElementById('activeUsers30');
+    if (activeUsers30El) activeUsers30El.textContent = data.activeUsers30 || 0;
+
     const pageViewsEl = document.getElementById('pageViews');
     if (pageViewsEl) pageViewsEl.textContent = (data.pageViews || 0).toLocaleString();
 
@@ -141,6 +144,17 @@ function updateMetricsFromApi(data) {
         const counts = keys.map(k => data.trafficSources[k] || 0);
         pieChart.data.datasets[0].data = counts;
         pieChart.update();
+    }
+
+    // Update traffic table
+    const trafficTableBody = document.querySelector('#trafficTable tbody');
+    if (trafficTableBody && data.trafficSources) {
+        trafficTableBody.innerHTML = '';
+        const sortedSources = Object.entries(data.trafficSources).sort((a, b) => b[1] - a[1]);
+        sortedSources.forEach(([source, count]) => {
+            const row = trafficTableBody.insertRow();
+            row.innerHTML = `<td>${source}</td><td style="text-align: right;">${count}</td>`;
+        });
     }
 
     // Update top pages

@@ -24,10 +24,16 @@
 
     <div class="metrics-grid">
         <div class="metric-card">
-            <div class="label">Active Users Right Now</div>
+            <div class="label">Active Users (5 min)</div>
             <div class="value">
                 <span id="activeUsers">0</span>
                 <span class="change positive" id="userChange">+0%</span>
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="label">Active Users (30 min)</div>
+            <div class="value">
+                <span id="activeUsers30">0</span>
             </div>
         </div>
         <div class="metric-card">
@@ -60,6 +66,17 @@
         <div class="chart-card">
             <h3>Traffic Sources</h3>
             <canvas id="pieChart"></canvas>
+            <div style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                <table id="trafficTable" style="width: 100%; text-align: left; font-size: 0.9em;">
+                    <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th style="text-align: right;">Count</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
     </div>
 

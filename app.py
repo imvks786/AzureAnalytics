@@ -160,6 +160,25 @@ def init_db():
         ) ENGINE=InnoDB
         """)
 
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS ip_geolocation (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            ip_address VARCHAR(50) UNIQUE,
+            site_id VARCHAR(100),
+            visitor_id VARCHAR(100),
+            country VARCHAR(100),
+            countryCode VARCHAR(10),
+            region VARCHAR(10),
+            regionName VARCHAR(100),
+            city VARCHAR(100),
+            lat DECIMAL(10, 6),
+            lon DECIMAL(10, 6),
+            timezone VARCHAR(50),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX (ip_address)
+        ) ENGINE=InnoDB
+        """)
+
 
         # cur.execute("""ALTER TABLE techstack ADD COLUMN visitor_id VARCHAR(100)""")
         # cur.execute("ALTER TABLE events ADD COLUMN page_title VARCHAR(255)")
@@ -419,7 +438,15 @@ def report_referrers(request: Request):
             return templates.TemplateResponse("report.html", {"request": request, "user": user, "sites": sites, "selected_site": None, "referrers": [], "bounce_rate": None})
 
         # validate ownership
-        if sites and site_id not in [s["site_id"] for s in sites]:
+        domain_to_exclude = None
+        found_site = False
+        for s in sites:
+            if s["site_id"] == site_id:
+                found_site = True
+                domain_to_exclude = s["domain"]
+                break
+        
+        if sites and not found_site:
             raise HTTPException(status_code=400, detail="Invalid site_id")
 
         # optional date range filters: ?start=YYYY-MM-DD&end=YYYY-MM-DD
@@ -428,6 +455,11 @@ def report_referrers(request: Request):
 
         where_clauses = ["site_id=%s"]
         params = [site_id]
+
+        # exclude internal referrers if domain is known
+        if domain_to_exclude:
+            where_clauses.append("referrer NOT LIKE %s")
+            params.append(f"%{domain_to_exclude}%")
 
         try:
             if start_q:
@@ -712,8 +744,14 @@ def realtime_metrics(request: Request):
         for p in pages[:10]:
             top_pages.append({"url": p[0], "views": p[1], "users": p[2]})
 
+        # active users last 30 minutes
+        sql = f"SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id IN ({placeholders}) AND created_at >= %s"
+        cur.execute(sql, tuple(site_ids) + (threshold_30,))
+        active_users_30 = cur.fetchone()[0] or 0
+
         return {
             "activeUsers": active_users,
+            "activeUsers30": active_users_30,
             "pageViews": page_views,
             "avgDuration": avg_duration,
             "bounceRate": bounce_rate,
