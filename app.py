@@ -622,7 +622,7 @@ async def collect(request: Request):
             page_url, referrer, user_agent, ip_address,
             language, platform, screen_size, timezone,
             clicked_url, is_external, page_title, scroll_percent
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
             site_id,
             visitor_id,
