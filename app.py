@@ -114,6 +114,8 @@ def init_db():
             timezone VARCHAR(50),
             clicked_url TEXT,
             is_external TINYINT(1),
+            page_title VARCHAR(255),
+            scroll_percent INT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             INDEX (site_id),
             INDEX (visitor_id),
@@ -180,8 +182,19 @@ def init_db():
         """)
 
 
-        # cur.execute("""ALTER TABLE techstack ADD COLUMN visitor_id VARCHAR(100)""")
-        # cur.execute("ALTER TABLE events ADD COLUMN page_title VARCHAR(255)")
+        # Ensure optional columns exist on upgrades
+        try:
+            cur.execute("ALTER TABLE TechStack ADD COLUMN visitor_id VARCHAR(100)")
+        except Exception:
+            pass
+        try:
+            cur.execute("ALTER TABLE events ADD COLUMN page_title VARCHAR(255)")
+        except Exception:
+            pass
+        try:
+            cur.execute("ALTER TABLE events ADD COLUMN scroll_percent INT")
+        except Exception:
+            pass
 
 
         conn.commit()
@@ -244,6 +257,7 @@ class CollectEvent(BaseModel):
     platform: str | None = None
     screenSize: str | None = None
     timezone: str | None = None
+    scrollPercent: float | None = None
     timestamp: str
 
 # ---------------- HEALTH ----------------
@@ -607,8 +621,8 @@ async def collect(request: Request):
             site_id, visitor_id, event_type,
             page_url, referrer, user_agent, ip_address,
             language, platform, screen_size, timezone,
-            clicked_url, is_external, page_title
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, %s)
+            clicked_url, is_external, page_title, scroll_percent
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
             site_id,
             visitor_id,
@@ -623,7 +637,8 @@ async def collect(request: Request):
             data.get("timezone"),
             data.get("clicked_url"),
             data.get("is_external"),
-            data.get("pageTitle")
+            data.get("pageTitle"),
+            data.get("scrollPercent")
         ))
         conn.commit()
 

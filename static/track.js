@@ -105,12 +105,14 @@
     if (scrollSent) return;
 
     const pos = window.scrollY + window.innerHeight;
-    const height = document.documentElement.scrollHeight;
+    const height = document.documentElement.scrollHeight || 1;
+    const percent = Math.min(100, Math.round((pos / height) * 100));
 
-    if (pos >= height - 5) {
+    if (percent >= 100) {
       scrollSent = true;
-      sendEvent("scroll");
     }
+    // Always send scroll event with percentage (once)
+    sendEvent("scroll", { scrollPercent: percent });
   });
 
   // ===============================
