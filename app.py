@@ -672,11 +672,11 @@ def get_rules(request: Request):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT selector, event_type, event_name FROM tracking_rules WHERE site_id=%s AND active=1", (site_id,))
+        cur.execute("SELECT id, selector, event_type, event_name FROM tracking_rules WHERE site_id=%s AND active=1", (site_id,))
         rows = cur.fetchall()
         rules = []
         for r in rows:
-            rules.append({"selector": r[0], "event_type": r[1], "event_name": r[2]})
+            rules.append({"id": r[0], "selector": r[1], "event_type": r[2], "event_name": r[3]})
         return {"rules": rules}
     finally:
         conn.close()
@@ -710,6 +710,143 @@ async def create_rule(request: Request):
                     (site_id, event_type, selector, event_name))
         conn.commit()
         return {"status": "ok"}
+    finally:
+        conn.close()
+
+
+@app.get("/manage_rules", response_class=HTMLResponse)
+def manage_rules_page(request: Request):
+    user = request.session.get("user")
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Fetch sites owned + shared
+        cur.execute("SELECT site_name, domain, site_id FROM sites WHERE user_id=%s UNION SELECT s.site_name, s.domain, s.site_id FROM sites s JOIN site_access sa ON s.site_id=sa.site_id WHERE sa.user_id=%s", (user_id, user_id))
+        rows = cur.fetchall()
+        sites = [{"site_name": r[0], "domain": r[1], "site_id": r[2]} for r in rows]
+
+        site_id = request.query_params.get("site_id")
+        if not site_id and sites:
+            site_id = sites[0]["site_id"]
+
+        rules = []
+        if site_id:
+            cur.execute("SELECT id, selector, event_type, event_name, active, created_at FROM tracking_rules WHERE site_id=%s ORDER BY created_at DESC", (site_id,))
+            rrows = cur.fetchall()
+            rules = [{"id": r[0], "selector": r[1], "event_type": r[2], "event_name": r[3], "active": bool(r[4]), "created_at": r[5].isoformat() if r[5] else None} for r in rrows]
+
+        return templates.TemplateResponse("manage_rules.html", {"request": request, "user": user, "sites": sites, "selected_site": site_id, "rules": rules})
+    finally:
+        conn.close()
+
+
+@app.get("/rule_analysis", response_class=HTMLResponse)
+def rule_analysis_page(request: Request):
+    user = request.session.get("user")
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Fetch sites owned + shared
+        cur.execute("SELECT site_name, domain, site_id FROM sites WHERE user_id=%s UNION SELECT s.site_name, s.domain, s.site_id FROM sites s JOIN site_access sa ON s.site_id=sa.site_id WHERE sa.user_id=%s", (user_id, user_id))
+        rows = cur.fetchall()
+        sites = [{"site_name": r[0], "domain": r[1], "site_id": r[2]} for r in rows]
+
+        site_id = request.query_params.get("site_id")
+        if not site_id and sites:
+            site_id = sites[0]["site_id"]
+
+        analysis = []
+        if site_id:
+            cur.execute(
+                """
+                SELECT tr.id, tr.event_name, tr.selector, tr.active,
+                       COUNT(e.id) AS clicks, MAX(e.created_at) AS last_click
+                FROM tracking_rules tr
+                LEFT JOIN events e ON e.site_id = tr.site_id AND e.event_type = tr.event_name
+                WHERE tr.site_id=%s
+                GROUP BY tr.id
+                ORDER BY clicks DESC
+                """,
+                (site_id,)
+            )
+            rows = cur.fetchall()
+            for r in rows:
+                analysis.append({
+                    "id": r[0],
+                    "event_name": r[1],
+                    "selector": r[2],
+                    "active": bool(r[3]),
+                    "clicks": int(r[4] or 0),
+                    "last_click": r[5].isoformat() if r[5] else None
+                })
+
+        return templates.TemplateResponse("rule_analysis.html", {"request": request, "user": user, "sites": sites, "selected_site": site_id, "analysis": analysis})
+    finally:
+        conn.close()
+
+
+@app.get("/audience", response_class=HTMLResponse)
+def audience_page(request: Request):
+    user = request.session.get("user")
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Fetch sites owned + shared
+        cur.execute("SELECT site_name, domain, site_id FROM sites WHERE user_id=%s UNION SELECT s.site_name, s.domain, s.site_id FROM sites s JOIN site_access sa ON s.site_id=sa.site_id WHERE sa.user_id=%s", (user_id, user_id))
+        rows = cur.fetchall()
+        sites = [{"site_name": r[0], "domain": r[1], "site_id": r[2]} for r in rows]
+
+        site_id = request.query_params.get("site_id")
+        if not site_id and sites:
+            site_id = sites[0]["site_id"]
+
+        # optional date filters
+        start_q = request.query_params.get("start")
+        end_q = request.query_params.get("end")
+        where_clauses = ["site_id=%s", "scroll_percent IS NOT NULL"]
+        params = [site_id]
+        try:
+            if start_q:
+                start_dt = datetime.fromisoformat(start_q)
+                where_clauses.append("created_at >= %s")
+                params.append(start_dt)
+            if end_q:
+                end_dt = datetime.fromisoformat(end_q) + timedelta(days=1)
+                where_clauses.append("created_at < %s")
+                params.append(end_dt)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
+        where_sql = " AND ".join(where_clauses)
+
+        scroll_buckets_sql = f"SELECT CASE WHEN scroll_percent>=100 THEN '100' WHEN scroll_percent>=90 THEN '90-99' WHEN scroll_percent>=70 THEN '70-89' WHEN scroll_percent>=50 THEN '50-69' ELSE '<50' END as bucket, COUNT(*) as cnt, COUNT(DISTINCT visitor_id) as visitors FROM events WHERE {where_sql} GROUP BY bucket ORDER BY cnt DESC"
+        cur.execute(scroll_buckets_sql, tuple(params))
+        bucket_rows = cur.fetchall()
+        buckets = [{"bucket": r[0], "count": int(r[1]), "visitors": int(r[2])} for r in bucket_rows]
+
+        # average scroll percent
+        cur.execute(f"SELECT AVG(scroll_percent) FROM events WHERE {where_sql}", tuple(params))
+        avg_row = cur.fetchone()
+        avg_scroll = float(avg_row[0]) if avg_row and avg_row[0] is not None else 0
+
+        # top pages by average scroll
+        cur.execute(f"SELECT page_url, AVG(scroll_percent) as avg_sc, COUNT(*) as cnt FROM events WHERE {where_sql} GROUP BY page_url ORDER BY avg_sc DESC LIMIT 20", tuple(params))
+        page_rows = cur.fetchall()
+        top_pages = [{"url": r[0], "avg_scroll": round(float(r[1]),1) if r[1] is not None else 0, "count": int(r[2])} for r in page_rows]
+
+        return templates.TemplateResponse("audience.html", {"request": request, "user": user, "sites": sites, "selected_site": site_id, "buckets": buckets, "avg_scroll": round(avg_scroll,1), "top_pages": top_pages})
     finally:
         conn.close()
 
@@ -817,13 +954,74 @@ def realtime_metrics(request: Request):
             else:
                 sources["Referral"] += cnt
 
-        # top pages (last 30 minutes)
-        sql = f"SELECT page_url, COUNT(*) as views, COUNT(DISTINCT visitor_id) as users FROM events WHERE site_id IN ({placeholders}) AND created_at >= %s GROUP BY page_url ORDER BY views DESC"
+        # top pages (last 30 minutes) - Python aggregation for better metrics
+        # Fetch raw events for last 30 mins
+        sql = f"SELECT visitor_id, page_url, page_title, event_type, created_at FROM events WHERE site_id IN ({placeholders}) AND created_at >= %s"
         cur.execute(sql, tuple(site_ids) + (threshold_30,))
-        pages = cur.fetchall()
+        raw_events = cur.fetchall()
+
+        # Process events
+        # visitor_events: {visitor_id: [events...]}
+        visitor_events = {}
+        # page_stats: {url: {'title': str, 'views': int, 'visitors': set(), 'events': int, 'bounces': int}}
+        page_stats = {}
+        
+        for r in raw_events:
+            vid = r[0]
+            url = r[1]
+            title = r[2]
+            etype = r[3]
+            
+            if vid not in visitor_events:
+                visitor_events[vid] = []
+            visitor_events[vid].append(r)
+            
+            if url not in page_stats:
+                page_stats[url] = {'title': title, 'views': 0, 'visitors': set(), 'events': 0, 'bounces': 0}
+            
+            # Update title if present (take last non-empty)
+            if title:
+                page_stats[url]['title'] = title
+                
+            page_stats[url]['events'] += 1
+            page_stats[url]['visitors'].add(vid)
+            
+            if etype == 'page_view':
+                page_stats[url]['views'] += 1
+
+        # Calculate bounces
+        # A bounce is a visitor with exactly 1 total event in this window.
+        balanced_visitor_events = {k: v for k, v in visitor_events.items()} # simple copy/ref if needed, but not really needed
+        
+        for vid, events in visitor_events.items():
+            if len(events) == 1:
+                # This visitor bounced. Attribute the bounce to the page they visited.
+                bounce_url = events[0][1]
+                if bounce_url in page_stats:
+                    page_stats[bounce_url]['bounces'] += 1
+
+        # Format top pages list
         top_pages = []
-        for p in pages[:10]:
-            top_pages.append({"url": p[0], "views": p[1], "users": p[2]})
+        for url, stats in page_stats.items():
+            users = len(stats['visitors'])
+            bounce_rate = 0
+            if users > 0:
+                bounce_rate = round((stats['bounces'] / users) * 100, 1)
+                
+            top_pages.append({
+                'url': url,
+                'title': stats['title'] or '(No Title)',
+                'views': stats['views'],
+                'users': users,
+                'event_count': stats['events'],
+                'bounce_rate': bounce_rate
+            })
+            
+        # Sort by active users desc, then views desc
+        top_pages.sort(key=lambda x: (x['users'], x['views']), reverse=True)
+        # return top 50
+        # return top 50
+        top_pages = top_pages[:50]
 
         # active users last 30 minutes
         sql = f"SELECT COUNT(DISTINCT visitor_id) FROM events WHERE site_id IN ({placeholders}) AND created_at >= %s"

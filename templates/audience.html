@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Audience - Scroll Analysis</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="/static/dashboard.css" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/css/navbar.css" />
+  <link rel="stylesheet" href="/static/css/sidebar.css" />
+</head>
+<body>
+  {% include 'navbar.html' %}
+  <div class="app-body">
+    {% include 'sidebar.html' %}
+
+    <main class="main-content">
+      <div class="header">
+        <h1>Audience — Scroll Analysis</h1>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label" for="siteSelect">Select Site:</label>
+          <select id="siteSelect" class="form-select">
+            {% for s in sites %}
+            <option value="{{ s.site_id }}" {% if s.site_id == selected_site %}selected{% endif %}>{{ s.site_name }} ({{ s.domain }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <h3>Scroll Percentage Distribution</h3>
+        <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Bucket</th>
+              <th>Events</th>
+              <th>Distinct Visitors</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in buckets %}
+            <tr>
+              <td>{{ b.bucket }}</td>
+              <td>{{ b.count }}</td>
+              <td>{{ b.visitors }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+
+        <h3 style="margin-top:18px">Average Scroll</h3>
+        <p><strong>{{ avg_scroll }}%</strong></p>
+
+        <h3 style="margin-top:18px">Top Pages by Average Scroll</h3>
+        <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Page URL</th>
+              <th style="text-align:right">Avg Scroll %</th>
+              <th style="text-align:right">Events</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in top_pages %}
+            <tr>
+              <td style="max-width:600px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.url }}</td>
+              <td style="text-align:right">{{ p.avg_scroll }}</td>
+              <td style="text-align:right">{{ p.count }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  {% include 'footer.html' %}
+
+  <script>
+    const siteSelect = document.getElementById('siteSelect');
+    if (siteSelect) {
+      siteSelect.addEventListener('change', function () {
+        const sid = siteSelect.value;
+        const url = new URL(window.location.href);
+        url.searchParams.set('site_id', sid);
+        window.location.href = url.toString();
+      });
+    }
+  </script>
+</body>
+</html>

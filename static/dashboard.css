@@ -377,6 +377,20 @@ tr:hover {
     border-color: #1a73e8;
 }
 
+/* Primary button used across pages */
+.btn-primary {
+    background: #1a73e8;
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.btn-primary:hover {
+    background: #1557b0;
+}
+
 .report-controls .sep {
     color: #9aa0a6;
     font-size: 14px;

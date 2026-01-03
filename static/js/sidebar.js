@@ -71,3 +71,16 @@ function initSidebarToggle() {
 window.addEventListener('DOMContentLoaded', function () {
     initSidebarToggle();
 });
+
+// Dropdown handling for sidebar groups
+window.addEventListener('DOMContentLoaded', function () {
+    const dropdownToggles = document.querySelectorAll('[data-dropdown]');
+    dropdownToggles.forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            const parent = btn.closest('.nav-dropdown');
+            if (!parent) return;
+            parent.classList.toggle('open');
+        });
+    });
+});

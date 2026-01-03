@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,102 +11,109 @@
     <link rel="stylesheet" href="/static/css/navbar.css" type="text/css">
     <link rel="stylesheet" href="/static/css/sidebar.css" type="text/css">
 </head>
+
 <body>
     {% include "navbar.html" %}
 
     <div class="app-body">
         {% include "sidebar.html" %}
 
-    <main class="main-content">
-        <div class="header">
-            <h1><span class="pulse"></span>Real-Time Overview</h1>
-            <p class="subtitle">Last updated: <span id="lastUpdate"></span></p>
-        </div>
+        <main class="main-content">
+            <div class="header">
+                <h1><span class="pulse"></span>Real-Time Overview</h1>
+                <p class="subtitle">Last updated: <span id="lastUpdate"></span></p>
+            </div>
 
-    <div class="metrics-grid">
-        <div class="metric-card">
-            <div class="label">Active Users (5 min)</div>
-            <div class="value">
-                <span id="activeUsers">0</span>
-                <span class="change positive" id="userChange">+0%</span>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="label">Active Users (5 min)</div>
+                    <div class="value">
+                        <span id="activeUsers">0</span>
+                        <span class="change positive" id="userChange">+0%</span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="label">Active Users (30 min)</div>
+                    <div class="value">
+                        <span id="activeUsers30">0</span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="label">Page Views (Last 30 min)</div>
+                    <div class="value">
+                        <span id="pageViews">0</span>
+                        <span class="change positive" id="viewChange">+0%</span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="label">Avg. Session Duration</div>
+                    <div class="value">
+                        <span id="avgDuration">0:00</span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="label">Bounce Rate</div>
+                    <div class="value">
+                        <span id="bounceRate">0%</span>
+                        <span class="change negative" id="bounceChange">0%</span>
+                    </div>
+                </div>
             </div>
-        </div>
-        <div class="metric-card">
-            <div class="label">Active Users (30 min)</div>
-            <div class="value">
-                <span id="activeUsers30">0</span>
-            </div>
-        </div>
-        <div class="metric-card">
-            <div class="label">Page Views (Last 30 min)</div>
-            <div class="value">
-                <span id="pageViews">0</span>
-                <span class="change positive" id="viewChange">+0%</span>
-            </div>
-        </div>
-        <div class="metric-card">
-            <div class="label">Avg. Session Duration</div>
-            <div class="value">
-                <span id="avgDuration">0:00</span>
-            </div>
-        </div>
-        <div class="metric-card">
-            <div class="label">Bounce Rate</div>
-            <div class="value">
-                <span id="bounceRate">0%</span>
-                <span class="change negative" id="bounceChange">0%</span>
-            </div>
-        </div>
-    </div>
 
-    <div class="charts-container">
-        <div class="chart-card">
-            <h3>Active Users (Last 30 Minutes)</h3>
-            <canvas id="lineChart"></canvas>
-        </div>
-        <div class="chart-card">
-            <h3>Traffic Sources</h3>
-            <canvas id="pieChart"></canvas>
-            <div style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
-                <table id="trafficTable" style="width: 100%; text-align: left; font-size: 0.9em;">
-                    <thead>
-                        <tr>
-                            <th>Source</th>
-                            <th style="text-align: right;">Count</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
+            <div class="charts-container">
+                <div class="chart-card">
+                    <h3>Active Users (Last 30 Minutes)</h3>
+                    <canvas id="lineChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Traffic Sources</h3>
+                    <canvas id="pieChart"></canvas>
+                    <div style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                        <table id="trafficTable" style="width: 100%; text-align: left; font-size: 0.9em;">
+                            <thead>
+                                <tr>
+                                    <th>Source</th>
+                                    <th style="text-align: right;">Count</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
 
-    <div class="bottom-section">
-        <div class="table-container">
-            <h3>Top Active Pages</h3>
-            <table id="pagesTable">
-                <thead>
-                    <tr>
-                        <th>Page URL</th>
-                        <th>Active Users</th>
-                        <th>Views</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-        <div class="chart-card events-card">
-            <h3><b>Event count by name (last 30 min)</b></h3>
-            <div id="eventsList" style="margin-top: 12px;"></div>
-        </div>
-    </div>
+            <div class="bottom-section">
+                <div class="table-container">
+                    <h3>Top Active Pages (30 min)</h3>
+                    <div class="table-responsive">
+                        <table id="realtimePagesTable">
+                            <thead>
+                                <tr>
+                                    <th>Page Title</th>
+                                    <th>Page URL</th>
+                                    <th style="text-align: right;">View</th>
+                                    <th style="text-align: right;">Active Users</th>
+                                    <th style="text-align: right;">Event Count</th>
+                                    <th style="text-align: right;">Bounce Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="chart-card events-card">
+                    <h3><b>Event count by name (last 30 min)</b></h3>
+                    <div id="eventsList" style="margin-top: 12px;"></div>
+                </div>
+            </div>
 
-    <script src="/static/dashboard.js"></script>
-    <script src="/static/js/navbar.js"></script>
-    <script src="/static/js/sidebar.js"></script>
-    </main>
+            <script src="/static/dashboard.js"></script>
+            <script src="/static/js/navbar.js"></script>
+            <script src="/static/js/sidebar.js"></script>
+        </main>
     </div>
 
     {% include "footer.html" %}
 </body>
+
 </html>

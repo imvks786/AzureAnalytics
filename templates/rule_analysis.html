@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rule Analysis</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="/static/dashboard.css" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/css/navbar.css" />
+  <link rel="stylesheet" href="/static/css/sidebar.css" />
+</head>
+
+<body>
+  {% include 'navbar.html' %}
+  <div class="app-body">
+    {% include 'sidebar.html' %}
+
+    <main class="main-content">
+      <div class="header">
+        <h1>Rule Analysis</h1>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label" for="siteSelect">Select Site:</label>
+            <select id="siteSelect" class="form-select">
+              {% for s in sites %}
+              <option value="{{ s.site_id }}" {% if s.site_id==selected_site %}selected{% endif %}>{{ s.site_name }} ({{
+                s.domain }})</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <h3>Rule Click Data</h3>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Rule Name</th>
+                  <th>Selector</th>
+                  <th>Active</th>
+                  <th style="text-align:right">Clicks</th>
+                  <th>Last Click</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in analysis %}
+                <tr>
+                  <td>{{ r.event_name }}</td>
+                  <td>{{ r.selector }}</td>
+                  <td>{{ 'Yes' if r.active else 'No' }}</td>
+                  <td style="text-align:right">{{ r.clicks }}</td>
+                  <td>{{ r.last_click or '-' }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  {% include 'footer.html' %}
+
+  <script>
+    const siteSelect = document.getElementById('siteSelect');
+    if (siteSelect) {
+      siteSelect.addEventListener('change', function () {
+        const sid = siteSelect.value;
+        const url = new URL(window.location.href);
+        url.searchParams.set('site_id', sid);
+        window.location.href = url.toString();
+      });
+    }
+  </script>
+</body>
+
+</html>

@@ -80,15 +80,18 @@ if (pieCanvas) {
 
 // Update pages table
 function updateTableFromApi(pages) {
-    const tbody = document.querySelector('#pagesTable tbody');
+    const tbody = document.querySelector('#realtimePagesTable tbody');
     if (!tbody) return;
     tbody.innerHTML = '';
     pages.forEach(page => {
         const row = tbody.insertRow();
         row.innerHTML = `
-            <td>${page.url || '(unknown)'}</td>
-            <td>${page.users}</td>
-            <td>${page.views} <span class="bar-graph" style="width: ${Math.min(200, page.views) / 3}px"></span></td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${page.title || '(No Title)'}</td>
+            <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${page.url}"><a href="${page.url}" target="_blank" style="color:#1a73e8;text-decoration:none">${page.url}</a></td>
+            <td style="text-align: right;">${page.views}</td>
+            <td style="text-align: right;">${page.users}</td>
+            <td style="text-align: right;">${page.event_count}</td>
+            <td style="text-align: right;">${page.bounce_rate}%</td>
         `;
     });
 }

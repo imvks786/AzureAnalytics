@@ -143,8 +143,10 @@
         .then((payload) => {
           const rules = (payload && payload.rules) || [];
           const attached = new Set();
+          const firedMap = new WeakMap(); // element -> Set of fired rule ids
           rules.forEach((r) => {
-            const key = r.event_type + '|' + r.selector;
+            const ruleId = r.id || (r.event_name + '|' + r.selector);
+            const key = r.event_type + '|' + r.selector + '|' + ruleId;
             if (attached.has(key)) return;
             attached.add(key);
 
@@ -152,10 +154,21 @@
             document.addEventListener(r.event_type, function (e) {
               const el = e.target.closest(r.selector);
               if (!el) return;
+
+              // ensure we only fire once per element per rule
+              let set = firedMap.get(el);
+              if (!set) {
+                set = new Set();
+                firedMap.set(el, set);
+              }
+              if (set.has(ruleId)) return;
+              set.add(ruleId);
+
               // send rule-defined event name
               sendEvent(r.event_name, {
                 selector: r.selector,
-                clicked_url: el.href || null
+                clicked_url: el.href || null,
+                rule_id: ruleId
               });
             });
           });
