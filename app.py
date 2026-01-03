@@ -154,6 +154,19 @@ def init_db():
         ) ENGINE=InnoDB
         """)
 
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS tracking_rules (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            site_id VARCHAR(50),
+            event_type VARCHAR(20),
+            selector VARCHAR(255),
+            event_name VARCHAR(100),
+            active BOOLEAN DEFAULT TRUE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX (site_id)
+        ) ENGINE=InnoDB
+        """)
+
         # Watermark table: tracks last processed watermark per table
         cur.execute("""
         CREATE TABLE IF NOT EXISTS watermark (
@@ -646,6 +659,59 @@ async def collect(request: Request):
         conn.close()
 
     return {"status": "ok"}
+
+
+# ---------------- Tracking rules API ----------------
+@app.get("/rules")
+def get_rules(request: Request):
+    """Public endpoint used by track.js to fetch active rules for a site."""
+    site_id = request.query_params.get("site_id")
+    if not site_id:
+        raise HTTPException(status_code=400, detail="site_id required")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT selector, event_type, event_name FROM tracking_rules WHERE site_id=%s AND active=1", (site_id,))
+        rows = cur.fetchall()
+        rules = []
+        for r in rows:
+            rules.append({"selector": r[0], "event_type": r[1], "event_name": r[2]})
+        return {"rules": rules}
+    finally:
+        conn.close()
+
+
+@app.post("/api/rules")
+async def create_rule(request: Request):
+    """Create a tracking rule from dashboard. Requires authenticated user who owns the site."""
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    data = await request.json()
+    site_id = data.get("site_id")
+    selector = data.get("selector")
+    event_type = data.get("event_type")
+    event_name = data.get("event_name")
+
+    if not (site_id and selector and event_type and event_name):
+        raise HTTPException(status_code=400, detail="Missing fields")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # verify ownership
+        cur.execute("SELECT 1 FROM sites WHERE site_id=%s AND user_id=%s", (site_id, user_id))
+        if not cur.fetchone():
+            raise HTTPException(status_code=403, detail="Not authorized to add rules for this site")
+
+        cur.execute("INSERT INTO tracking_rules (site_id, event_type, selector, event_name) VALUES (%s, %s, %s, %s)",
+                    (site_id, event_type, selector, event_name))
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        conn.close()
 
 #---------------- Realtime metrics ----------------
 @app.get("/api/realtime")
