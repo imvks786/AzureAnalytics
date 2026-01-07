@@ -22,7 +22,7 @@ jobs:
       - name: Set up Python version
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.14'
 
       # 🛠️ Local Build Section (Optional)
       # The following section in your workflow is designed to catch build issues early on the client side, before deployment. This can be helpful for debugging and validation. However, if this step significantly increases deployment time and early detection is not critical for your workflow, you may remove this section to streamline the deployment process.
@@ -63,9 +63,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_466A62D9660A4149AA520D7045BCB846 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_DCDB9DB305654B9B9349CEF83E338CD1 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_C4E4E0285AD34F10B216A9260681475E }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_57265DF643504B098B5923C66FE2834A }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_C0E0BAE5897748CFBEC5AC77E752F53A }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_EA7434A97E964F3C8A09D4CF50FAC2C9 }}
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
@@ -73,8 +73,4 @@ jobs:
         with:
           app-name: 'analytics-imvks'
           slot-name: 'Production'
-          package: '.'
-          startup-command: "gunicorn -w 4 -k uvicorn.workers.UvicornWorker app:app"
-
           
-
