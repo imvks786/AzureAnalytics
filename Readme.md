@@ -58,12 +58,18 @@ In Azure Databricks, SQL data is transformed and written into two Parquet datase
 Property & Data Stream Management (Frontend – Google Analytics Style). This project follows a Google Analytics–like property model on the frontend.
 
 **1. Create a Property:** 
+
+<img width="1883" height="898" alt="image" src="https://github.com/user-attachments/assets/728687a7-6117-4468-a7a6-f8005569a6df" />
+
 A Property represents a logical container for measurement data.
 - Each property holds analytics data for one or more websites
 - A unique Site ID is generated per property
 - All events, page views, and rules are linked to this property
 
+
 **2. Set Up Data Stream:** A Web Data Stream is configured for each website under a property to start collecting events.
+
+<img width="1910" height="888" alt="image" src="https://github.com/user-attachments/assets/e4024945-46fb-4acd-aeb5-b4b61ca2a125" />
 
 **Web Stream Configuration:**
 - Website URL: https://john.in
@@ -79,6 +85,8 @@ A Property represents a logical container for measurement data.
 These events are captured automatically without additional configuration.
 
 **3. Installation Instructions:** To start tracking, install the analytics script on your website.
+
+<img width="1889" height="900" alt="image" src="https://github.com/user-attachments/assets/668b1d37-138f-439e-96c1-211a4f5622a4" />
 
 **Manual Installation**
 - Copy and paste the following tag immediately after the <head> element on every page of your website.
