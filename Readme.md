@@ -19,6 +19,9 @@ This project demonstrates an end-to-end data engineering and analytics solution 
 
 # Azure Data Factory Pipeline
 ## Pipeline Flow
+
+<img width="1592" height="438" alt="Screenshot 2026-01-12 170408" src="https://github.com/user-attachments/assets/810667cb-8d10-4d75-9982-77f7d6e33e6d" />
+
 1. Lookup – Last Processed Date: Fetches the watermark / last processed timestamp for incremental load.
 2. Copy Data – Raw to ADLS: Copies incremental SQL data into ADLS (raw zone).
 3. Databricks Notebook Activity: Reads raw SQL data
@@ -96,6 +99,8 @@ These events are captured automatically without additional configuration.
 - Events are sent securely to the analytics backend
 
 ## Real-Time Overview
+<img width="1887" height="901" alt="Screenshot 2026-01-02 152903" src="https://github.com/user-attachments/assets/5ade6bc0-007a-4cce-a021-7ccbcc158852" />
+
 * Active users (5 min / 30 min)
 * Page views
 * Bounce rate
@@ -107,6 +112,9 @@ These events are captured automatically without additional configuration.
 * External URLs
 
 ## Tech Details
+<img width="1888" height="819" alt="Screenshot 2026-01-02 153027" src="https://github.com/user-attachments/assets/d271e54e-f028-4f69-905c-bc2be737c3b7" />
+<img width="1880" height="895" alt="Screenshot 2026-01-02 153041" src="https://github.com/user-attachments/assets/ebf92459-be78-4c81-82c3-cd1ac9d3a9a5" />
+
 * Browser distribution
 * Operating system breakdown
 * Device category (Desktop / Mobile)
