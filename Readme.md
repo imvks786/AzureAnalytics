@@ -19,6 +19,9 @@ This project demonstrates an end-to-end data engineering and analytics solution 
 
 # Azure Data Factory Pipeline
 ## Pipeline Flow
+
+<img width="1592" height="438" alt="Screenshot 2026-01-12 170408" src="https://github.com/user-attachments/assets/810667cb-8d10-4d75-9982-77f7d6e33e6d" />
+
 1. Lookup – Last Processed Date: Fetches the watermark / last processed timestamp for incremental load.
 2. Copy Data – Raw to ADLS: Copies incremental SQL data into ADLS (raw zone).
 3. Databricks Notebook Activity: Reads raw SQL data
@@ -58,12 +61,18 @@ In Azure Databricks, SQL data is transformed and written into two Parquet datase
 Property & Data Stream Management (Frontend – Google Analytics Style). This project follows a Google Analytics–like property model on the frontend.
 
 **1. Create a Property:** 
+
+<img width="1883" height="898" alt="image" src="https://github.com/user-attachments/assets/728687a7-6117-4468-a7a6-f8005569a6df" />
+
 A Property represents a logical container for measurement data.
 - Each property holds analytics data for one or more websites
 - A unique Site ID is generated per property
 - All events, page views, and rules are linked to this property
 
+
 **2. Set Up Data Stream:** A Web Data Stream is configured for each website under a property to start collecting events.
+
+<img width="1910" height="888" alt="image" src="https://github.com/user-attachments/assets/e4024945-46fb-4acd-aeb5-b4b61ca2a125" />
 
 **Web Stream Configuration:**
 - Website URL: https://john.in
@@ -80,6 +89,8 @@ These events are captured automatically without additional configuration.
 
 **3. Installation Instructions:** To start tracking, install the analytics script on your website.
 
+<img width="1889" height="900" alt="image" src="https://github.com/user-attachments/assets/668b1d37-138f-439e-96c1-211a4f5622a4" />
+
 **Manual Installation**
 - Copy and paste the following tag immediately after the <head> element on every page of your website.
 - Do not add more than one tag per page.
@@ -88,6 +99,8 @@ These events are captured automatically without additional configuration.
 - Events are sent securely to the analytics backend
 
 ## Real-Time Overview
+<img width="1887" height="901" alt="Screenshot 2026-01-02 152903" src="https://github.com/user-attachments/assets/5ade6bc0-007a-4cce-a021-7ccbcc158852" />
+
 * Active users (5 min / 30 min)
 * Page views
 * Bounce rate
@@ -99,6 +112,9 @@ These events are captured automatically without additional configuration.
 * External URLs
 
 ## Tech Details
+<img width="1888" height="819" alt="Screenshot 2026-01-02 153027" src="https://github.com/user-attachments/assets/d271e54e-f028-4f69-905c-bc2be737c3b7" />
+<img width="1880" height="895" alt="Screenshot 2026-01-02 153041" src="https://github.com/user-attachments/assets/ebf92459-be78-4c81-82c3-cd1ac9d3a9a5" />
+
 * Browser distribution
 * Operating system breakdown
 * Device category (Desktop / Mobile)
