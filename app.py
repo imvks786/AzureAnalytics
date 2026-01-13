@@ -622,10 +622,10 @@ async def collect(request: Request):
         cur.execute(
             """
             INSERT INTO visitors (visitor_id, site_id, last_seen)
-            VALUES (%s, %s, NOW())
-            ON DUPLICATE KEY UPDATE last_seen = NOW()
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE last_seen = %s
             """,
-            (visitor_id, site_id)
+            (visitor_id, site_id, datetime.utcnow(), datetime.utcnow())
         )
 
         # insert event
@@ -634,8 +634,9 @@ async def collect(request: Request):
             site_id, visitor_id, event_type,
             page_url, referrer, user_agent, ip_address,
             language, platform, screen_size, timezone,
-            clicked_url, is_external, page_title, scroll_percent
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            clicked_url, is_external, page_title, scroll_percent,
+            created_at
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
             site_id,
             visitor_id,
@@ -651,7 +652,8 @@ async def collect(request: Request):
             data.get("clicked_url"),
             data.get("is_external"),
             data.get("pageTitle"),
-            data.get("scrollPercent")
+            data.get("scrollPercent"),
+            datetime.utcnow()
         ))
         conn.commit()
 
