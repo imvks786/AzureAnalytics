@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demographics Reports - Analytics</title>
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/dashboard.css">
+    <link rel="stylesheet" href="/static/css/navbar.css">
+    <link rel="stylesheet" href="/static/css/sidebar.css">
+
+    <style>
+        .map-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            margin-bottom: 24px;
+            height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #map {
+            flex-grow: 1;
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            z-index: 1;
+            /* fix layering */
+        }
+
+        .filter-bar {
+            background: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+        }
+
+        select.site-select {
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 14px;
+            min-width: 200px;
+        }
+
+        .header {
+            margin-bottom: 24px;
+        }
+    </style>
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <div class="app-body">
+        {% include "sidebar.html" %}
+
+        <main class="main-content">
+            <div class="header">
+                <h1>Visitor Demographics</h1>
+                <p class="subtitle">Understand where your users are coming from</p>
+            </div>
+
+            <div class="filter-bar">
+                <label style="font-weight: 500; color: #64748b;">Select Site:</label>
+                <form id="siteForm" method="GET" action="/reports/demographics" style="margin: 0;">
+                    <select name="site_id" class="site-select" onchange="this.form.submit()">
+                        {% for site in sites %}
+                        <option value="{{ site.site_id }}" {% if site.site_id==selected_site %}selected{% endif %}>
+                            {{ site.site_name }} ({{ site.domain }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+
+            <div class="map-card">
+                <h3 style="margin-bottom: 16px; font-weight: 600;">Geographic Distribution</h3>
+                <div id="map"></div>
+            </div>
+
+            <div class="chart-card">
+                <h3>Location Details</h3>
+                <div class="table-responsive">
+                    <table class="data-table" style="width: 100%; text-align: left; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #f1f5f9;">
+                                <th style="padding: 12px; font-weight: 600;">Country</th>
+                                <th style="padding: 12px; font-weight: 600;">Region</th>
+                                <th style="padding: 12px; font-weight: 600;">City</th>
+                                <th style="padding: 12px; font-weight: 600; text-align: right;">Visitors</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for loc in locations %}
+                            <tr style="border-bottom: 1px solid #f8fafc;">
+                                <td style="padding: 12px;">
+                                    {% if loc.countryCode %}
+                                    <img src="https://flagcdn.com/20x15/{{ loc.countryCode|lower }}.png"
+                                        alt="{{ loc.country }}" style="vertical-align: middle; margin-right: 8px;">
+                                    {% endif %}
+                                    {{ loc.country }}
+                                </td>
+                                <td style="padding: 12px;">{{ loc.region }}</td>
+                                <td style="padding: 12px;">{{ loc.city }}</td>
+                                <td style="padding: 12px; text-align: right;"><strong>{{ loc.visitors }}</strong></td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" style="padding: 24px; text-align: center; color: #94a3b8;">No location
+                                    data available for this site.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+
+            <!-- Leaflet JS -->
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+                integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+            <script src="/static/js/navbar.js"></script>
+            <script src="/static/js/sidebar.js"></script>
+
+            <script>
+                // Initialize Map
+                // Default to 0,0 zoom 2 if no locations, else center on first location
+                var locations = {{ locations | tojson }};
+                var mapCenter = [20, 0];
+                var mapZoom = 2;
+
+                if (locations.length > 0) {
+                    mapCenter = [locations[0].lat, locations[0].lon];
+                    mapZoom = 4;
+                }
+
+                var map = L.map('map').setView(mapCenter, mapZoom);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap'
+                }).addTo(map);
+
+                // Add markers
+                locations.forEach(function (loc) {
+                    if (loc.lat && loc.lon) {
+                        L.circleMarker([loc.lat, loc.lon], {
+                            radius: Math.min(Math.max(loc.visitors * 2, 5), 20), // Scale radius by visitors
+                            fillColor: "#3b82f6",
+                            color: "#2563eb",
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.6
+                        })
+                            .bindPopup(`<b>${loc.city}, ${loc.country}</b><br>Visitors: ${loc.visitors}`)
+                            .addTo(map);
+                    }
+                });
+            </script>
+        </main>
+    </div>
+    {% include "footer.html" %}
+</body>
+
+</html>

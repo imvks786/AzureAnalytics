@@ -795,6 +795,66 @@ def rule_analysis_page(request: Request):
         conn.close()
 
 
+
+@app.get("/reports/demographics", response_class=HTMLResponse)
+def report_demographics(request: Request):
+    user = request.session.get("user")
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        # Fetch sites owned + shared (reused logic)
+        cur.execute("SELECT site_name, domain, site_id FROM sites WHERE user_id=%s UNION SELECT s.site_name, s.domain, s.site_id FROM sites s JOIN site_access sa ON s.site_id=sa.site_id WHERE sa.user_id=%s", (user_id, user_id))
+        rows = cur.fetchall()
+        sites = [{"site_name": r[0], "domain": r[1], "site_id": r[2]} for r in rows]
+
+        site_id = request.query_params.get("site_id")
+        if not site_id and sites:
+            site_id = sites[0]["site_id"]
+        
+        # Verify access
+        authorized_ids = [s["site_id"] for s in sites]
+        if site_id and site_id not in authorized_ids:
+             raise HTTPException(status_code=403, detail="Not authorized")
+
+        locations = []
+        if site_id:
+            # Aggregate visitor locations
+            # Count distinct visitors per location
+            sql = """
+            SELECT country, regionName, city, lat, lon, COUNT(DISTINCT visitor_id) as visitors
+            FROM ip_geolocation
+            WHERE site_id=%s AND lat IS NOT NULL AND lon IS NOT NULL
+            GROUP BY country, regionName, city, lat, lon
+            ORDER BY visitors DESC
+            LIMIT 1000
+            """
+            cur.execute(sql, (site_id,))
+            loc_rows = cur.fetchall()
+            for r in loc_rows:
+                locations.append({
+                    "country": r[0],
+                    "region": r[1],
+                    "city": r[2],
+                    "lat": float(r[3]),
+                    "lon": float(r[4]),
+                    "visitors": int(r[5])
+                })
+
+        return templates.TemplateResponse("demographics.html", {
+            "request": request,
+            "user": user,
+            "sites": sites,
+            "selected_site": site_id,
+            "locations": locations
+        })
+    finally:
+        conn.close()
+
+
 @app.get("/audience", response_class=HTMLResponse)
 def audience_page(request: Request):
     user = request.session.get("user")
